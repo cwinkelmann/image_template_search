@@ -57,13 +57,35 @@ def _cached_detect_and_compute(detector, img, img_path, cache_path: Path = Path(
         kp, des = detector.detectAndCompute(img, None)
 
         if cache_path is not None:
-            with open(descriptors_cache_path, 'wb') as f:
-                pickle.dump(des, f)
-            with open(keypooints_cache_path, 'wb') as f:
-                keypoints_picklable = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in kp]
-                pickle.dump(keypoints_picklable, f)
+
+            persist_descriptors(des, descriptors_cache_path)
+            persist_keypoints(kp, keypooints_cache_path)
 
     return kp, des
+
+
+def persist_descriptors(des, descriptors_cache_path):
+    """
+    Persist the descriptors of opencv
+    :param des:
+    :param descriptors_cache_path:
+    """
+    with open(descriptors_cache_path, 'wb') as f:
+        pickle.dump(des, f)
+
+
+def persist_keypoints(kp, keypooints_cache_path):
+    """
+    Persist the keypoints of opencv
+    :param kp:
+    :param keypooints_cache_path:
+    :return:
+    """
+    with open(keypooints_cache_path, 'wb') as f:
+        keypoints_picklable = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in
+                               kp]
+        pickle.dump(keypoints_picklable, f)
+
 
 def _cached_matcher(flann, des1, des2, img_1_path: Path, img_2_path: Path,
                     k=2, cache_path: Path = Path("cache")):

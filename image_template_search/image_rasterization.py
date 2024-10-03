@@ -129,8 +129,7 @@ def crop_polygons(image: PIL.Image,
 
 
 def tile_large_image(x, y, tile_size_x, tile_size_y,
-                     overlap_x, overlap_y,
-                     large_image, template_path, tile_base_path, prefix):
+                     large_image, tile_base_path, prefix):
     """
     Wrapper function to extract the tile and call match_template.
     Adjusts match coordinates for their position in the original image.

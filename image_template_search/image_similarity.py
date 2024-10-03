@@ -4,6 +4,7 @@
 
 import gc
 import math
+import pickle
 
 import shapely
 import torch
@@ -15,9 +16,89 @@ import numpy as np
 import random
 
 from image_template_search.image_rasterization import tile_large_image
-from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher
+from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
+    persist_descriptors, persist_keypoints
+from image_template_search.util.util import get_image_id
 from lightglue import LightGlue, SIFT
 from lightglue.utils import load_image, rbd
+
+
+def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
+                                                       tile_size_x, tile_size_y,
+                                                       overlap_x, overlap_y,
+                                                       tile_base_path, cache_path):
+    """
+    Extract keypoints and descriptors from a large image by tiling it
+    :param detector:
+    :param large_image:
+    :param tile_size_x:
+    :param tile_size_y:
+    :param overlap_x:
+    :param overlap_y:
+    :param tile_base_path:
+    :param cache_path:
+    :return:
+    """
+
+    if cache_path is not None:
+        img_id = get_image_id(image=large_image)
+        keypooints_cache_path = cache_path / f"{img_id}_keypoints.pkl"
+        descriptors_cache_path = cache_path / f"{img_id}_descriptors.pkl"
+
+    if cache_path is not None and keypooints_cache_path.exists() and descriptors_cache_path.exists():
+        # TODO write a function for this
+        with open(keypooints_cache_path, 'rb') as f:
+            kp2 = pickle.load(f)
+            kp2 = [cv2.KeyPoint(x=pt[0], y=pt[1], size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
+                               class_id=pt[6]) for pt in kp2]
+        with open(descriptors_cache_path, 'rb') as f:
+            des2 = pickle.load(f)
+
+    else:
+
+        kp2s = []
+        des2s = []
+
+        for y in range(0, large_image.shape[0], tile_size_y - overlap_y):
+            for x in range(0, large_image.shape[1], tile_size_x - overlap_x):
+                try:
+                    tile_path = tile_large_image(x, y, tile_size_x, tile_size_y,
+                                                 large_image,
+                                                 tile_base_path,
+                                                 prefix=tile_base_path.name)
+
+                    img2 = cv2.imread(str(tile_path), cv2.IMREAD_GRAYSCALE)  # train
+
+                    kp2, des2 = _cached_detect_and_compute(detector, img=img2,
+                                                           img_path=tile_path, cache_path=None)
+
+                    # we need to modify the points to match the original image
+                    kp_list = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in
+                               kp2]
+
+                    kp2 = [cv2.KeyPoint(x=pt[0] + x, y=pt[1] + y, size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
+                                        class_id=pt[6]) for pt in kp_list]
+
+                    # the keypoints and descriptors are stored in a list
+                    if len(kp2) > 0:
+                        kp2s.append(kp2)
+                    if des2 is not None:
+                        des2s.append(des2)
+
+                except RuntimeError as e:
+                    logger.error(f"error processing tile: {x}, {y}, {e}")
+
+        # assemble all keypoints and descriptors from the tiles
+        kp2 = [item for sublist in kp2s for item in sublist]
+        des2 = [item for sublist in des2s for item in sublist]
+        del (des2s)
+        del (kp2s)
+        gc.collect()
+
+        persist_descriptors(des=des2, descriptors_cache_path=descriptors_cache_path)
+        persist_keypoints(kp=kp2, keypooints_cache_path=keypooints_cache_path)
+
+    return kp2, des2
 
 def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
@@ -219,9 +300,6 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
     overlap_y = 0
     pad_size = 0
 
-    kp2s = []
-    des2s = []
-
     # get the keypoints and descriptors of the template image
     template_image = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
     template_image = cv2.resize(template_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
@@ -230,46 +308,16 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
                                            cache_path=cache_path)
 
     # process the bigger image by tiling it tiled big image
-    for y in range(0, large_image.shape[0], tile_size_y - overlap_y):
-        for x in range(0, large_image.shape[1], tile_size_x - overlap_x):
-            try:
-                tile_path = tile_large_image(x, y, tile_size_x, tile_size_y, overlap_x, overlap_y,
-                                             large_image,
-                                             template_path,
-                                             tile_base_path,
-                                             prefix=tile_base_path.name)
-
-                img2 = cv2.imread(str(tile_path), cv2.IMREAD_GRAYSCALE)  # train
-
-                kp2, des2 = _cached_detect_and_compute(detector, img=img2,
-                                                       img_path=tile_path, cache_path=cache_path)
-
-                # we need to modify the points to match the original image
-                kp_list = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in
-                           kp2]
-
-                kp2 = [cv2.KeyPoint(x=pt[0] + x, y=pt[1] + y, size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
-                                    class_id=pt[6]) for pt in kp_list]
-
-                # the keypoints and descriptors are stored in a list
-                if len(kp2) > 0:
-                    kp2s.append(kp2)
-                if des2 is not None:
-                    des2s.append(des2)
+    ## Apply the caching here instead of caching the tiles
+    ## TODO Caching here
 
 
-            except RuntimeError as e:
-                logger.error(f"error processing tile: {x}, {y}, {e}")
 
+    kp2, des2 = _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
+                                                                     tile_size_x, tile_size_y, overlap_x, overlap_y,
+                                                       tile_base_path, cache_path)
     del (large_image)
-
-    # assemble all keypoints and descriptors from the tiles
-    kp2 = [item for sublist in kp2s for item in sublist]
-    des2 = [item for sublist in des2s for item in sublist]
-    del (des2s)
-    del (kp2s)
     gc.collect()
-
 
     ### match the keypoints and descriptors of both images
 
@@ -372,7 +420,9 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
         return False
 
 
-def find_patch_stacked(template_path, large_image_paths, output_path, cache_path, MIN_MATCH_COUNT = 50):
+def find_patch_stacked(template_path, large_image_paths, output_path,
+                       tile_path, cache_path, MIN_MATCH_COUNT = 50,
+                       tile_size_x=1500, tile_size_y=1500):
     """
     find a crop in multiple other images
 
@@ -391,9 +441,14 @@ def find_patch_stacked(template_path, large_image_paths, output_path, cache_path
                                     large_image_path,
                                     output_path=output_path,
                                     cache_path=cache_path,
-                                MIN_MATCH_COUNT=MIN_MATCH_COUNT)
-        if crop:
+                                MIN_MATCH_COUNT=MIN_MATCH_COUNT,
+                                tile_size_x=tile_size_x, tile_size_y=tile_size_y)
+
+        if isinstance(crop, np.ndarray):
             crops.append(crop)
+        else:
+            # no match
+            pass
 
     return crops
 

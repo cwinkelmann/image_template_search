@@ -64,6 +64,30 @@ class ImageSimilarityTestCase(unittest.TestCase):
         self.assertTrue(isinstance(crop, np.ndarray))  # add assertion here
         self.assertEqual((1280, 1280, 3), crop.shape, "The crop patch should be 512x512x3")
 
+    def test_tiled_template_images_search_2(self):
+        """
+        Find similar images in a dataset
+        :return:
+        """
+        template_path = Path(f"./data/crop_0_1280.jpg")
+        large_image_path = Path(f'./data/DJI_0018.JPG')
+
+        with tempfile.TemporaryDirectory() as cache_dir:
+            cache_dir = Path(cache_dir)
+            # cache_dir = Path("./cache") # temporary hack to speed up testing
+
+
+            output_path = Path("./output")
+            crop = find_patch_tiled(template_path,
+                                    large_image_path,
+                                    tile_size_x=1500,
+                                    tile_size_y=1500,
+                                    output_path=output_path,
+                                    cache_path=cache_dir, MIN_MATCH_COUNT=200)
+
+        self.assertTrue(isinstance(crop, np.ndarray))  # add assertion here
+        self.assertEqual((1280, 1280, 3), crop.shape, "The crop patch should be 512x512x3")
+
 
     def test_tiled_template_images_search_no_match(self):
         """
@@ -87,26 +111,26 @@ class ImageSimilarityTestCase(unittest.TestCase):
 
         self.assertFalse(crop, "patch is not present")
 
-
     def test_stack_crops(self):
         template_path = Path(f"./data/crop_0_1280.jpg")
         large_image_path_1 = Path(f'./data/DJI_0018.JPG')
         large_image_path_2 = Path(f'./data/DJI_0019.JPG')
-        large_image_path_3 = Path(f'./data/DJI_0227.JPG') # NO MATCH IMAGE
+        large_image_path_3 = Path(f'./data/DJI_0227.JPG')  # NO MATCH IMAGE
 
-        # TODO what happens if there is no match
-
-        large_image_paths = [ large_image_path_1, large_image_path_2, large_image_path_3 ]
+        large_image_paths = [large_image_path_1, large_image_path_2, large_image_path_3]
 
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
+            cache_dir = Path("./cache") # temporary hack to speed up testing
+
 
             output_path = Path("./output")
             crops = find_patch_stacked(template_path,
-                                    large_image_paths,
-                                    output_path=output_path,
-                                    cache_path=cache_dir,
-                                       MIN_MATCH_COUNT=200)
+                                       large_image_paths,
+                                       output_path=output_path,
+                                       tile_path=cache_dir,
+                                       cache_path=cache_dir,
+                                       MIN_MATCH_COUNT=100)
 
         self.assertEqual(2, len(crops), "It should find two matches")
 
