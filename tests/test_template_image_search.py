@@ -74,7 +74,7 @@ class ImageSimilarityTestCase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
-            # cache_dir = Path("./cache") # temporary hack to speed up testing
+            cache_dir = Path("./cache_nc") # temporary hack to speed up testing
 
 
             output_path = Path("./output")
@@ -130,6 +130,8 @@ class ImageSimilarityTestCase(unittest.TestCase):
                                        output_path=output_path,
                                        tile_path=cache_dir,
                                        cache_path=cache_dir,
+                                        tile_size_x=1500,
+                                       tile_size_y=1500,
                                        MIN_MATCH_COUNT=100)
 
         self.assertEqual(2, len(crops), "It should find two matches")

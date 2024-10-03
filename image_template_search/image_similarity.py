@@ -95,8 +95,9 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
         del (kp2s)
         gc.collect()
 
-        persist_descriptors(des=des2, descriptors_cache_path=descriptors_cache_path)
-        persist_keypoints(kp=kp2, keypooints_cache_path=keypooints_cache_path)
+        if cache_path is not None:
+            persist_descriptors(des=des2, descriptors_cache_path=descriptors_cache_path)
+            persist_keypoints(kp=kp2, keypooints_cache_path=keypooints_cache_path)
 
     return kp2, des2
 
@@ -311,11 +312,13 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
     ## Apply the caching here instead of caching the tiles
     ## TODO Caching here
 
-
-
     kp2, des2 = _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
-                                                                     tile_size_x, tile_size_y, overlap_x, overlap_y,
-                                                       tile_base_path, cache_path)
+                                                                   tile_size_x, tile_size_y, overlap_x, overlap_y,
+                                                                   tile_base_path, None)
+
+    # kp2, des2 = _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
+    #                                                                  tile_size_x, tile_size_y, overlap_x, overlap_y,
+    #                                                    tile_base_path, cache_path)
     del (large_image)
     gc.collect()
 
@@ -335,8 +338,11 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
         search_params = dict(checks=50)
         flann = cv2.FlannBasedMatcher(index_params, search_params)
 
+        # FIXME the caching of matches does not work
+        # matches = _cached_matcher(flann, des1, des2, template_path, Path(large_image_path), k=2,
+        #                           cache_path=cache_path)
         matches = _cached_matcher(flann, des1, des2, template_path, Path(large_image_path), k=2,
-                                  cache_path=cache_path)
+                                  cache_path=None)
 
     good = []
     try:

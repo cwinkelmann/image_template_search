@@ -31,7 +31,7 @@ def transform_points(M, point):
     return transformed_point1_homogeneous
 
 
-def _cached_detect_and_compute(detector, img, img_path, cache_path: Path = Path("cache")):
+def _cached_detect_and_compute(detector, img, img_path, cache_path: Path = None):
     """
     Detect and compute the keypoints and descriptors
     :param detector:
@@ -88,7 +88,7 @@ def persist_keypoints(kp, keypooints_cache_path):
 
 
 def _cached_matcher(flann, des1, des2, img_1_path: Path, img_2_path: Path,
-                    k=2, cache_path: Path = Path("cache")):
+                    k=2, cache_path: Path = None):
     """
     Cache the matches
     :param flann:
@@ -114,13 +114,14 @@ def _cached_matcher(flann, des1, des2, img_1_path: Path, img_2_path: Path,
                 [cv2.DMatch(_queryIdx=qidx, _trainIdx=tidx, _imgIdx=idx, _distance=dist) for qidx, tidx, idx, dist in
                  inner_list] for inner_list in matches]
     else:
+        logger.info(f"Computing matches for {img_1_path.name} and {img_2_path.name}")
         matches = flann.knnMatch(des1, des2, k=2)
         matches_picklable = [[(m.queryIdx, m.trainIdx, m.imgIdx, m.distance) for m in match_list] for match_list in matches]
 
         if cache_path is not None:
             with open(matches_cache_path, 'wb') as f:
                 pickle.dump(matches_picklable, f)
-
+        logger.info(f"Matches computed for {img_1_path.name} and {img_2_path.name}")
     return matches
 
 def find_rotation(img1_path: Path, img2_path: Path, cache_path):
