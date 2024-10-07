@@ -260,7 +260,7 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
                      tile_size_y=1200,
                      tile_base_path=Path("./"),
                      cache_path=Path("./cache"),
-                     MIN_MATCH_COUNT = 50):
+                     MIN_MATCH_COUNT = 50, visualise=False):
     """
     TODO refactor the parameters
     TODO tile from the center as well
@@ -381,19 +381,20 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
         large_image = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
         large_image = cv2.resize(large_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
 
-        plt.imshow(large_image, 'gray')
-        fig.savefig(output_path / "large_image_footprint.jpg") # TODO give it a good name
-        plt.show()
+        if visualise:
+            plt.imshow(large_image, 'gray')
+            fig.savefig(output_path / "large_image_footprint.jpg") # TODO give it a good name
+            plt.show()
 
-        draw_params = dict(matchColor=(0, 255, 0),  # Draw matches in green color
-                           singlePointColor=None,
-                           flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            draw_params = dict(matchColor=(0, 255, 0),  # Draw matches in green color
+                               singlePointColor=None,
+                               flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
-        fig = plt.figure(figsize=(20, 20))
-        img_matches = cv2.drawMatches(template_image, kp1, large_image, kp2, good, None, **draw_params)
-        plt.imshow(img_matches, 'gray')
-        fig.savefig(output_path / "large_image_match.jpg")
-        plt.show()
+            fig = plt.figure(figsize=(20, 20))
+            img_matches = cv2.drawMatches(template_image, kp1, large_image, kp2, good, None, **draw_params)
+            plt.imshow(img_matches, 'gray')
+            fig.savefig(output_path / "large_image_match.jpg")
+            plt.show()
 
 
         theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
@@ -410,13 +411,13 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
 
         rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
                                                          (template_image.shape[1], template_image.shape[0]))
-
-        fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
-        # Display the result
-        plt.imshow(rotated_cropped_image_bbox)
-        # plt.axis('off')  # Hide axis
-        plt.show()
-        rotated_cropped_image_bbox_path = output_path / "rotated_cropped_image_bbox.jpg"
+        if visualise:
+            fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
+            # Display the result
+            plt.imshow(rotated_cropped_image_bbox)
+            # plt.axis('off')  # Hide axis
+            plt.show()
+        rotated_cropped_image_bbox_path = output_path / f"rotated_cropped_image_bbox_{large_image_path.stem}.jpg"
         cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
 
         return rotated_cropped_image_bbox
@@ -428,7 +429,8 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
 
 def find_patch_stacked(template_path, large_image_paths, output_path,
                        tile_path, cache_path, MIN_MATCH_COUNT = 50,
-                       tile_size_x=1500, tile_size_y=1500):
+                       tile_size_x=1500, tile_size_y=1500,
+                       visualise=False):
     """
     find a crop in multiple other images
 
@@ -444,11 +446,11 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
 
     for large_image_path in large_image_paths:
         crop = find_patch_tiled(template_path,
-                                    large_image_path,
-                                    output_path=output_path,
-                                    cache_path=cache_path,
+                                large_image_path,
+                                output_path=output_path,
+                                cache_path=cache_path,
                                 MIN_MATCH_COUNT=MIN_MATCH_COUNT,
-                                tile_size_x=tile_size_x, tile_size_y=tile_size_y)
+                                tile_size_x=tile_size_x, tile_size_y=tile_size_y, visualise=False)
 
         if isinstance(crop, np.ndarray):
             crops.append(crop)
@@ -457,6 +459,8 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
             pass
 
     return crops
+
+
 
 
 
