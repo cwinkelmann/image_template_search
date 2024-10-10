@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from shapely import Polygon
 from shapely.affinity import affine_transform
 
-from image_template_search.image_similarity import ImagePatchFinder
+from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel
 from image_template_search.util.util import visualise_polygons, visualise_image, create_box_around_point, \
     crop_objects_from_image
@@ -131,10 +131,10 @@ def cutout_detection_deduplication(source_image_path: Path,
                                    other_images: list[Image],
                                    images_path: Path,
                                    output_path: Path,
-
                                    ):
     """
     Cutout the detection from the image
+
     :param template_image:
     :return:
     """
@@ -145,18 +145,42 @@ def cutout_detection_deduplication(source_image_path: Path,
         ipf = ImagePatchFinder(source_image_path,
                                template_polygon=cutout_polygon,
                                large_image_path=images_path / large_image.dataset_name / large_image.image_name)
+
         if ipf.find_patch():
-            # ipf.project_image(output_path=output_path)
-
-            # ipf.footprint
-
+            warped_path = ipf.project_image(output_path=output_path)
 
             ax = visualise_image(image_path=images_path / large_image.dataset_name / large_image.image_name, show=False, title=f"{large_image.image_name}", dpi=75)
             ax = visualise_polygons([ipf.footprint], color="white", show=False, ax=ax, linewidth=2.5)
-            ax = visualise_polygons([ipf.proj_template_polygon], color="red", show=True, ax=ax, linewidth=2.5, filename=output_path / f"template_proj_to_{large_image.image_name}.jpg")
+            ax = visualise_polygons([ipf.proj_template_polygon], color="red", show=True, ax=ax, linewidth=2.5,
+                                    filename=output_path / f"template_proj_to_{large_image.image_name}.jpg")
+
+            ax_w = visualise_image(image_path=warped_path, show=False, title=f"Warped {large_image.image_name}", dpi=75)
+            ax_w = visualise_polygons([ipf.template_polygon], color="white", show=True, ax=ax_w, linewidth=2.5,
+                                      filename=output_path / f"warped_{large_image.image_name}.jpg")
 
 
 
+            # transform the annotations of the large image to the template image
+            polygons = [l.bbox_polygon for l in large_image.labels]
+
+            ax_i = visualise_image(image_path=images_path / large_image.dataset_name / large_image.image_name, show=False, title=f"Annotations on {large_image.image_name}", dpi=75)
+            ax_i = visualise_polygons(polygons, color="green", show=True, ax=ax_i, linewidth=2.5,
+                                      filename=output_path / f"annotations_{large_image.image_name}.jpg")
+
+            ax_q = visualise_image(image_path=images_path / large_image.dataset_name / large_image.image_name, show=False, title=f"{large_image.image_name}", dpi=75)
+            ax_q = visualise_polygons([ipf.proj_template_polygon], color="red", show=False, ax=ax_q, linewidth=2.5)
+            ax_q = visualise_polygons([t.bbox_polygon for t in  template_labels], color="red", show=False, ax=ax_q, linewidth=2.5)
+
+            ax_q = visualise_polygons(polygons, color="yellow", show=True, ax=ax_q, linewidth=2.5, title=f"Warped Annotations on {large_image.image_name}",
+                                      filename=output_path / f"warped_with_annotations{large_image.image_name}.jpg")
+
+            # check if the annotations are in the cutout
+            containing_labels = [l for l in large_image.labels if ipf.proj_template_polygon.contains(l.bbox_polygon.centroid)]
+
+            # TODO check if these are the same instances we know from the template
+            template_labels = [l for l in template_labels if ipf.proj_template_polygon.contains(l.bbox_polygon.centroid)]
+
+            pass
 
 
 
@@ -193,13 +217,13 @@ def demo_template():
     :return:
     """
     hA = hA_from_file(
-        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_07.json"))
+        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_10.json"))
     images_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
     output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
     template_image = hA.images[0]
     other_images = [hA.images[14]] # take a single image which covers perfectly
-    other_images = hA.images[14:20]  # take testing subset
-    other_images = hA.images  # take al
+    # other_images = hA.images[14:20]  # take testing subset
+    # other_images = hA.images  # take al
 
     p_image = PILImage.open(
         images_path / template_image.dataset_name / template_image.image_name)  # Replace with your image file path
@@ -216,7 +240,7 @@ def demo_template():
         template_image_path = output_path / f"{template_image.image_name}_template.jpg"
         t.save(template_image_path) # a bit
 
-        cutout_detection_deduplication(
+        crop_counts = cutout_detection_deduplication(
                                        source_image_path=images_path / template_image.dataset_name / template_image.image_name,
                                        cutout_polygon=template_extents[i],
                                        template_labels=objs_in_template[i],

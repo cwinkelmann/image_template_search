@@ -19,7 +19,7 @@ import random
 from image_template_search.image_rasterization import tile_large_image
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
     persist_descriptors, persist_keypoints
-from image_template_search.util.util import get_image_id
+from image_template_search.util.util import get_image_id, cache_to_disk
 from lightglue import LightGlue, SIFT
 from lightglue.utils import load_image, rbd
 
@@ -102,6 +102,7 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
 
     return kp2, des2
 
+@cache_to_disk(cache_dir="similarity_cache")
 def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
     get the similarity between two images
@@ -152,7 +153,7 @@ def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Te
 
 def find_rotation_gen(m_kpts0: np.ndarray,
                       m_kpts1: np.ndarray,
-                      image_name: str | Path) -> (np.ndarray, np.ndarray, np.ndarray):
+                      image_name: str | Path) -> (np.ndarray, np.ndarray, shapely.Polygon):
     """
     find the footprint of the template in the image
     :param m_kpts0:
@@ -164,15 +165,13 @@ def find_rotation_gen(m_kpts0: np.ndarray,
         image_name = Path(image_name)
 
     M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, 5.0)
-    # M2, mask2 = cv2.getAffineTransform(m_kpts0, m_kpts1)
     img1 = cv2.imread(str(image_name), cv2.IMREAD_GRAYSCALE)
     h, w = img1.shape
-    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
-                                                                               2)  # This is the box of the query image
+    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
 
-    # M = np.linalg.inv(M)
     footprint = cv2.perspectiveTransform(pts, M)
     footprint = np.int32(footprint.reshape(4, 2))
+    footprint = shapely.Polygon(footprint.reshape(4, 2))
 
     return M, mask, footprint
 
@@ -477,7 +476,7 @@ from shapely.geometry import Polygon
 def project_bounding_box(bbox_a: Polygon, M: np.ndarray) -> Polygon:
     """
     Project a Shapely bounding box from Image A to Image B using the cv2 perspectiveTransform function.
-
+    # TODO project this so we can project points, lines and polygons
     :param bbox_a: Bounding box in Image A (as a Shapely Polygon)
     :param M: 3x3 perspective transformation matrix
     :return: Transformed bounding box in Image B (as a Shapely Polygon)
@@ -513,6 +512,10 @@ class ImagePatchFinder(object):
     proj_template_polygon: shapely.Polygon
     large_image_path: Path
 
+    large_image: np.ndarray
+    large_image_shape: tuple
+    warped_image_B: np.ndarray
+
     M_: np.ndarray
     M: np.ndarray
     mask: np.ndarray
@@ -521,6 +524,7 @@ class ImagePatchFinder(object):
 
 
     def __init__(self, template_path, template_polygon, large_image_path):
+        self.warped_image_B = None
         self.proj_template_polygon = None
         self.footprint = None
         self.M_ = None
@@ -532,7 +536,7 @@ class ImagePatchFinder(object):
         self.large_image_path = large_image_path
         self.matched_templates = []
 
-        self.large_image_shape = cv2.imread(str(large_image_path)).shape
+
 
 
         # TODO integrate the simple functions so the code is rather wrapped and seperated
@@ -551,9 +555,9 @@ class ImagePatchFinder(object):
         :param output_path:
         :return:
         """
-
+        logger.info(f"Extracting Keypoints from query and source images")
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path, Path(self.large_image_path))
-        logger.info(f"normalised_sim: {normalised_sim}")
+        logger.info(f"Keypoints found. Normalised similarity: {normalised_sim}")
 
         if normalised_sim < 0.1:
             logger.error("The template is not in the image")
@@ -562,35 +566,34 @@ class ImagePatchFinder(object):
         if not isinstance(output_path, Path):
             output_path = Path(output_path)
 
+        logger.info(f"findHomography of both images")
         M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
                                                m_kpts1.cpu().numpy(),
                                                image_name=self.large_image_path)
-
+        logger.info("Homography found")
         self.M = M
         self.M_ = np.linalg.inv(M)
         self.mask = mask
-        self.footprint = footprint
 
-        h, w, c = self.large_image_shape # TODO prevent reading the image again
-        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
-                                                                                   2)  # This is the box of the query image
+        # self.footprint = footprint
 
-        dst = cv2.perspectiveTransform(pts, M)
+        # h, w, c = self.large_image_shape # TODO prevent reading the image again
+        #pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
+        #                                                                            2)  # This is the box of the query image
+
+        # dst = cv2.perspectiveTransform(pts, M)
 
         # TODO transform the footprint of the template to the matched other image
         self.proj_template_polygon = project_bounding_box(self.template_polygon, M)
 
+
         # draw the matches outer box
-        footprint = np.int32(dst.reshape(4, 2))
-        ## TODO create the footprint from that
-
-        ## plot the footprint of the template on the base image
-        footprint = shapely.Polygon(footprint.reshape(4, 2))
-
+        # footprint = np.int32(dst.reshape(4, 2))
+        # footprint = shapely.Polygon(footprint.reshape(4, 2))
         self.footprint = footprint
 
         self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
-        print(f"The camera rotated: {round(self.theta, 2)} degrees")
+        logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
 
         return True
 
@@ -599,15 +602,26 @@ class ImagePatchFinder(object):
         Project the template image on the large image
         :return:
         """
-        template_image = cv2.imread(str(self.template_path))
-        template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
-        large_image = cv2.imread(self.large_image_path, cv2.IMREAD_COLOR)
-        large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
-        rotated_cropped_image_bbox = cv2.warpPerspective(large_image,
-                                                         self.M_,
-                                                         (template_image.shape[1], template_image.shape[0]))
-        matched_template_path = f"template_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
 
-        rotated_cropped_image_bbox_path = output_path / matched_template_path
+        template_image = cv2.imread(str(self.template_path))
+        self.template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
+
+        large_image = cv2.imread(str(self.large_image_path), cv2.IMREAD_COLOR)
+        self.large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+        self.large_image_shape = self.large_image.shape
+
+
+        rotated_cropped_image_bbox = cv2.warpPerspective(self.large_image,
+                                                         self.M_,
+                                                         dsize=(self.template_image.shape[1], self.template_image.shape[0]))
+
+        self.warped_image_B = cv2.warpPerspective(self.large_image, self.M_,
+                                                  dsize=(self.template_image.shape[1], self.template_image.shape[0]))
+
+        matched_source_image = f"warped_source_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
+
+        rotated_cropped_image_bbox_path = output_path / matched_source_image
         cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+
+        return rotated_cropped_image_bbox_path
 

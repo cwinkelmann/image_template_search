@@ -17,12 +17,50 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from PIL import Image
+from loguru import logger
 from matplotlib import pyplot as plt
 import matplotlib.axis as axis
 import matplotlib.patches as patches
 import matplotlib.axes as axes
 from shapely import Polygon
 from shapely.geometry import box, Point
+
+import os
+import joblib
+import torch
+from functools import wraps
+from pathlib import Path
+import hashlib
+
+def cache_to_disk(cache_dir="cache"):
+    """
+    Decorator to cache the results of the function to disk.
+    :param cache_dir: Directory where cached results will be stored
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(image0: Path, image1: Path, *args, **kwargs):
+            # Ensure cache directory exists
+            os.makedirs(cache_dir, exist_ok=True)
+
+            # Create a unique cache file name based on the inputs (hash the paths)
+            cache_key = hashlib.md5(f"{image0}{image1}".encode()).hexdigest()
+            cache_file = os.path.join(cache_dir, f"{cache_key}.pkl")
+
+            # Check if cache exists
+            if os.path.exists(cache_file):
+                # Load cached result
+                logger.info(f"Loading cached result for {image0} and {image1}")
+                return joblib.load(cache_file)
+
+            # Call the function and cache the result
+            result = func(image0, image1, *args, **kwargs)
+            joblib.dump(result, cache_file)
+            logger.info(f"Cached result to {cache_file}")
+
+            return result
+        return wrapper
+    return decorator
 
 
 def get_image_id(filename: Path = None, image: np.ndarray = None):
