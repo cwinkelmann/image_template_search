@@ -6,6 +6,7 @@ import gc
 import math
 import pickle
 
+import PIL.Image
 import shapely
 import torch
 from loguru import logger
@@ -143,6 +144,7 @@ def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Te
         del(image0_T)
         gc.collect()
         return normalised_sim, m_kpts0, m_kpts1
+
     else:
         logger.warning(f"Image too small or not propper: {image1_T.shape}")
         return 0, torch.tensor([]), torch.tensor([])
@@ -150,7 +152,7 @@ def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Te
 
 def find_rotation_gen(m_kpts0: np.ndarray,
                       m_kpts1: np.ndarray,
-                      image_name:str) -> (np.ndarray, np.ndarray, np.ndarray):
+                      image_name: str | Path) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     find the footprint of the template in the image
     :param m_kpts0:
@@ -158,6 +160,9 @@ def find_rotation_gen(m_kpts0: np.ndarray,
     :param image_name:
     :return:
     """
+    if isinstance(image_name, str):
+        image_name = Path(image_name)
+
     M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, 5.0)
     # M2, mask2 = cv2.getAffineTransform(m_kpts0, m_kpts1)
     img1 = cv2.imread(str(image_name), cv2.IMREAD_GRAYSCALE)
@@ -172,7 +177,9 @@ def find_rotation_gen(m_kpts0: np.ndarray,
     return M, mask, footprint
 
 
-def find_patch(template_path: Path, large_image_path: Path, output_path = Path("./output")):
+def find_patch(template_path: Path,
+               large_image_path: Path,
+               output_path = Path("./output")):
     """
     Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
     TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
@@ -214,6 +221,7 @@ def find_patch(template_path: Path, large_image_path: Path, output_path = Path("
 
     ## plot the footprint of the template on the base image
     footprint = shapely.Polygon(footprint.reshape(4, 2))
+    bounds = footprint.bounds
 
     fig = plt.figure(figsize=(20, 20))
     large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
@@ -251,7 +259,7 @@ def find_patch(template_path: Path, large_image_path: Path, output_path = Path("
     rotated_cropped_image_bbox_path = output_path / f"t_{template_identifier}_b{large_image_identifier}_rotated_cropped_image_bbox.jpg"
     cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
 
-    return rotated_cropped_image_bbox
+    return rotated_cropped_image_bbox, footprint
 
 
 def find_patch_tiled(template_path: Path, large_image_path: Path,
@@ -461,13 +469,145 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
     return crops
 
 
+import cv2
+import numpy as np
+from shapely.geometry import Polygon
 
+
+def project_bounding_box(bbox_a: Polygon, M: np.ndarray) -> Polygon:
+    """
+    Project a Shapely bounding box from Image A to Image B using the cv2 perspectiveTransform function.
+
+    :param bbox_a: Bounding box in Image A (as a Shapely Polygon)
+    :param M: 3x3 perspective transformation matrix
+    :return: Transformed bounding box in Image B (as a Shapely Polygon)
+    """
+    # Extract the bounding box coordinates (minx, miny, maxx, maxy)
+    minx, miny, maxx, maxy = bbox_a.bounds
+
+    # Define the four corners of the bounding box in Image A
+    corners_a = np.array([
+        [minx, miny],
+        [maxx, miny],
+        [maxx, maxy],
+        [minx, maxy]
+    ], dtype=np.float32).reshape(-1, 1, 2)  # Reshape for cv2.perspectiveTransform (Nx1x2)
+
+    # Apply the perspective transformation to the corners
+    corners_b = cv2.perspectiveTransform(corners_a, M)
+
+    # Convert the transformed points back to a list of tuples (x, y)
+    transformed_corners = corners_b.reshape(-1, 2)
+
+    # Create a new polygon with the transformed corners in Image B
+    bbox_b = Polygon(transformed_corners)
+
+    return bbox_b
 
 
 class ImagePatchFinder(object):
 
-    def __init__(self, template_path, large_image_path):
+    footprint: shapely.Polygon
+    template_path: Path
+    template_polygon: shapely.Polygon
+    proj_template_polygon: shapely.Polygon
+    large_image_path: Path
+
+    M_: np.ndarray
+    M: np.ndarray
+    mask: np.ndarray
+    theta: float
+
+
+
+    def __init__(self, template_path, template_polygon, large_image_path):
+        self.proj_template_polygon = None
+        self.footprint = None
+        self.M_ = None
+        self.M = None
+        self.mask = None
+
         self.template_path = template_path
+        self.template_polygon = template_polygon
         self.large_image_path = large_image_path
+        self.matched_templates = []
+
+        self.large_image_shape = cv2.imread(str(large_image_path)).shape
+
 
         # TODO integrate the simple functions so the code is rather wrapped and seperated
+
+    def __call__(self, *args, **kwargs):
+        return self.find_patch()
+
+
+    def find_patch(self,
+               output_path = Path("./output")):
+        """
+        Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
+        TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
+        :param template_path:
+        :param large_image_path:
+        :param output_path:
+        :return:
+        """
+
+        normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path, Path(self.large_image_path))
+        logger.info(f"normalised_sim: {normalised_sim}")
+
+        if normalised_sim < 0.1:
+            logger.error("The template is not in the image")
+            return False
+
+        if not isinstance(output_path, Path):
+            output_path = Path(output_path)
+
+        M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
+                                               m_kpts1.cpu().numpy(),
+                                               image_name=self.large_image_path)
+
+        self.M = M
+        self.M_ = np.linalg.inv(M)
+        self.mask = mask
+        self.footprint = footprint
+
+        h, w, c = self.large_image_shape # TODO prevent reading the image again
+        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
+                                                                                   2)  # This is the box of the query image
+
+        dst = cv2.perspectiveTransform(pts, M)
+
+        # TODO transform the footprint of the template to the matched other image
+        self.proj_template_polygon = project_bounding_box(self.template_polygon, M)
+
+        # draw the matches outer box
+        footprint = np.int32(dst.reshape(4, 2))
+        ## TODO create the footprint from that
+
+        ## plot the footprint of the template on the base image
+        footprint = shapely.Polygon(footprint.reshape(4, 2))
+
+        self.footprint = footprint
+
+        self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
+        print(f"The camera rotated: {round(self.theta, 2)} degrees")
+
+        return True
+
+    def project_image(self, output_path):
+        """
+        Project the template image on the large image
+        :return:
+        """
+        template_image = cv2.imread(str(self.template_path))
+        template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
+        large_image = cv2.imread(self.large_image_path, cv2.IMREAD_COLOR)
+        large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+        rotated_cropped_image_bbox = cv2.warpPerspective(large_image,
+                                                         self.M_,
+                                                         (template_image.shape[1], template_image.shape[0]))
+        matched_template_path = f"template_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
+
+        rotated_cropped_image_bbox_path = output_path / matched_template_path
+        cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+

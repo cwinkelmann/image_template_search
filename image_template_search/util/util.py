@@ -16,12 +16,14 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 from matplotlib import pyplot as plt
 import matplotlib.axis as axis
 import matplotlib.patches as patches
 import matplotlib.axes as axes
 from shapely import Polygon
+from shapely.geometry import box, Point
+
 
 def get_image_id(filename: Path = None, image: np.ndarray = None):
     """
@@ -44,7 +46,7 @@ def get_image_id(filename: Path = None, image: np.ndarray = None):
 
 def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapely.Point] = (),
                        filename=None, show=False, title = None,
-                       max_x=None, max_y=None, color="blue", ax:axes.Axes =None) -> axes.Axes:
+                       max_x=None, max_y=None, color="blue", ax:axes.Axes =None, linewidth=0.5, markersize=0.5) -> axes.Axes:
     """
     Visualize a list of polygons
     :param polygons:
@@ -62,10 +64,10 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapel
         plt.title(title)
     for polygon in polygons:
         x, y = polygon.exterior.xy
-        ax.plot(x, y, color=color, linewidth=0.5)
+        ax.plot(x, y, color=color, linewidth=linewidth)
     for point in points:
         x, y = point.xy
-        ax.plot(x, y, marker='o', color=color, linewidth=0.5, markersize=0.5)
+        ax.plot(x, y, marker='o', color=color, linewidth=linewidth, markersize=markersize)
     if filename:
         plt.savefig(filename)
     if show:
@@ -108,3 +110,58 @@ def visualise_image(image_path: Path = None,
         # sleep(0.1)
     else:
         return ax
+
+
+
+
+def create_box_around_point(center: Point, a: float, b: float) -> box:
+    """
+
+    """
+    x_center, y_center = center.x, center.y
+
+    # Calculate the min and max x, y values for the box
+    minx = x_center - a / 2
+    maxx = x_center + a / 2
+    miny = y_center - b / 2
+    maxy = y_center + b / 2
+
+    # Create a box with these bounds
+    return box(minx, miny, maxx, maxy)
+
+
+from PIL import Image
+from shapely.geometry import Polygon
+from typing import List, Tuple
+
+
+def crop_objects_from_image(image: Image, bbox_polygons: List[Polygon]) -> List[Image]:
+    """
+    Crop the rectangular polygons from the image and return them as a list of cropped images.
+
+    :param image: PIL image from which objects are to be cropped
+    :param bbox_polygons: List of rectangular Shapely polygons representing bounding boxes
+    :return: List of cropped PIL images
+    """
+    cropped_images = []
+
+    for polygon in bbox_polygons:
+        # Ensure the polygon is a rectangle
+        if not polygon.is_valid or len(polygon.exterior.coords) != 5:
+            raise ValueError("One of the polygons is not a valid rectangle.")
+
+        # Get the bounding box coordinates (minx, miny, maxx, maxy)
+        minx, miny, maxx, maxy = polygon.bounds
+
+        # Ensure the bounding box fits within the image dimensions
+        img_width, img_height = image.size
+        minx, miny = max(0, minx), max(0, miny)
+        maxx, maxy = min(img_width, maxx), min(img_height, maxy)
+
+        # Crop the image using the bounding box
+        cropped_image = image.crop((minx, miny, maxx, maxy))
+
+        # Append the cropped image to the list
+        cropped_images.append(cropped_image)
+
+    return cropped_images
