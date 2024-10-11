@@ -570,6 +570,7 @@ class ImagePatchFinder(object):
 
 
     def __init__(self, template_path, template_polygon, large_image_path):
+        self.template_image = None
         self.warped_image_B = None
         self.proj_template_polygon = None
         self.footprint = None

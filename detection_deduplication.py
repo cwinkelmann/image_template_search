@@ -38,12 +38,16 @@ def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]],
 
             # TODO
             buffer = create_box_around_point(pc, a=patch_size, b=patch_size)
+
+            covered_objects.extend([l for l in image.labels if buffer.contains(l.centroid)])
+
+
             cropped_annotations, buffer = project_annotations_to_crop(buffer=buffer,
                                                                       imagelabels=every_other_label)
             template_annotations.append(cropped_annotations)
             template_extent.append(buffer)
 
-            covered_objects.append(l)
+            #covered_objects.append(l)
 
     return template_annotations, template_extent
 

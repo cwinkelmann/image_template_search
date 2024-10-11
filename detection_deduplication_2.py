@@ -30,6 +30,7 @@ def cutout_detection_deduplication(source_image_path: Path,
     """
     covered_objects = []
     template_crops = []
+
     for large_image in other_images:
         logger.info(f"finding template patch in {large_image.image_name}")
 
@@ -44,39 +45,52 @@ def cutout_detection_deduplication(source_image_path: Path,
         # This is hacky, but we need to make sure that the patch is found properly
         if ipf.find_patch(similarity_threshold=0.1):
 
-            # project B annotations to template
-            large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
+            ipf.project_image(output_path=output_path)
 
-            if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:
-                logger.warning(f"template object is not in the image {large_image.image_name}")
+            frame_height, frame_width = ipf.warped_image_B.shape[:2]
+            frame_polygon = Polygon([(0, 0), (0, frame_height), (frame_width, frame_height), (frame_width, 0)])
 
-            elif ipf_t.find_patch(similarity_threshold=0.05):
-                warped_path = ipf_t.project_image(output_path=output_path)
-
-                large_image_proj_labels = [project_bounding_box(l, ipf_t.M_) for l in copy.copy(large_image.labels)]
-
-                xmin, ymin, xmax, ymax =  ipf_t.template_polygon.bounds
-                frame_width = xmax - xmin
-                frame_height = ymax - ymin
-                frame_polygon = Polygon([ (0, 0), (0, frame_height), (frame_width, frame_height), (frame_width, 0) ])
-
-                # filter out labels that are not within the template
-                large_image_labels_containing = \
-                    [l for l in large_image_proj_labels if frame_polygon.contains(l.centroid)]
+            # Check if the polygon is fully within the frame polygon
+            if frame_polygon.contains(ipf.proj_template_polygon):
+                logger.info(f"The frame is within the template polygon")
 
 
-                ax_c = visualise_image(image_path=warped_path,
-                                       show=False,
-                                       title=f"Cropped {large_image.image_name} with {len(large_image_labels_containing)} objects",
-                                       dpi=75)
+                # project B annotations to template
+                large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
 
-                ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
-                                          color="red", show=True, ax=ax_c,
-                                          linewidth=7.5, filename=output_path / f"cropped_{large_image.image_name}_{len(large_image_labels_containing)}_objects.jpg")
+                if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:
+                    logger.warning(f"template object is not in the image {large_image.image_name}")
 
-                i = Image(image_name=warped_path.name, height=frame_height, width=frame_width, labels=large_image_labels_containing)
+                elif ipf_t.find_patch(similarity_threshold=0.05):
+                    warped_path = ipf_t.project_image(output_path=output_path)
 
-                covered_objects.append(i)
+                    large_image_proj_labels = [project_bounding_box(l, ipf_t.M_) for l in copy.copy(large_image.labels)]
+
+                    xmin, ymin, xmax, ymax =  ipf_t.template_polygon.bounds
+                    frame_width = xmax - xmin
+                    frame_height = ymax - ymin
+                    frame_polygon = Polygon([ (0, 0), (0, frame_height), (frame_width, frame_height), (frame_width, 0) ])
+
+                    # filter out labels that are not within the template
+                    large_image_labels_containing = \
+                        [l for l in large_image_proj_labels if frame_polygon.contains(l.centroid)]
+
+
+                    ax_c = visualise_image(image_path=warped_path,
+                                           show=False,
+                                           title=f"Cropped {large_image.image_name} with {len(large_image_labels_containing)} objects",
+                                           dpi=75)
+
+                    ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
+                                              color="red", show=True, ax=ax_c,
+                                              linewidth=7.5, filename=output_path / f"cropped_{large_image.image_name}_{len(large_image_labels_containing)}_objects.jpg")
+
+                    i = Image(image_name=warped_path.name, height=frame_height, width=frame_width, labels=large_image_labels_containing)
+
+                    covered_objects.append(i)
+
+            else:
+                logger.warning(f"The frame is not within the template polygon")
 
     return covered_objects
 
@@ -102,6 +116,7 @@ def demo_template():
     p_image = PILImage.open(
         images_path / ann_template_image.dataset_name / ann_template_image.image_name)  # Replace with your image file path
 
+    # FIXME this should not return 14 extents if there 14 objects in the image
     objs_in_template, template_extents = find_objects(ann_template_image, patch_size=1280)
 
     # crop
@@ -109,11 +124,16 @@ def demo_template():
                                         bbox_polygons=template_extents)  # TODO refactor this
 
     for i, t in enumerate(templates):
-        ax_q = visualise_image(image=t, show=False, title=f"template {i} with annotations", output_file_name=None)
-        visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue", show=True, ax=ax_q, linewidth=4.5)
 
-        template_image_path = output_path / f"{ann_template_image.image_name}_template.jpg"
+        template_image_path = output_path / f"{ann_template_image.image_name}_template_{i}.jpg"
         t.save(template_image_path)  # a bit
+
+        ax_q = visualise_image(image=t, show=False, title=f"template {i} with annotations", output_file_name=None)
+        visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
+                           filename=output_path / f"{ann_template_image.image_name}_template_ann_{i}.jpg",
+                           show=True, ax=ax_q, linewidth=4.5)
+
+
 
         covered_objects = cutout_detection_deduplication(
             source_image_path=images_path / ann_template_image.dataset_name / ann_template_image.image_name,
