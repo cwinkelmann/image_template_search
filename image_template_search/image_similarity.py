@@ -1,10 +1,11 @@
 """
 
 """
-
+import copy
 import gc
 import math
 import pickle
+import typing
 
 import PIL.Image
 import shapely
@@ -16,10 +17,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+from shapely.affinity import affine_transform
+
 from image_template_search.image_rasterization import tile_large_image
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
     persist_descriptors, persist_keypoints
-from image_template_search.util.util import get_image_id, cache_to_disk
+from image_template_search.util.HastyAnnotationV2 import ImageLabel
+from image_template_search.util.util import get_image_id, cache_to_disk, create_box_around_point
 from lightglue import LightGlue, SIFT
 from lightglue.utils import load_image, rbd
 
@@ -101,6 +105,8 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
             persist_keypoints(kp=kp2, keypooints_cache_path=keypooints_cache_path)
 
     return kp2, des2
+
+
 
 @cache_to_disk(cache_dir="similarity_cache")
 def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
@@ -473,7 +479,7 @@ import numpy as np
 from shapely.geometry import Polygon
 
 
-def project_bounding_box(bbox_a: Polygon, M: np.ndarray) -> Polygon:
+def project_bounding_box(label: typing.Union[Polygon, ImageLabel], M: np.ndarray) -> typing.Union[Polygon, ImageLabel]:
     """
     Project a Shapely bounding box from Image A to Image B using the cv2 perspectiveTransform function.
     # TODO project this so we can project points, lines and polygons
@@ -482,6 +488,12 @@ def project_bounding_box(bbox_a: Polygon, M: np.ndarray) -> Polygon:
     :return: Transformed bounding box in Image B (as a Shapely Polygon)
     """
     # Extract the bounding box coordinates (minx, miny, maxx, maxy)
+    if isinstance(label, ImageLabel):
+        bbox_a = label.bbox_polygon
+    else:
+        bbox_a = label
+
+    # TODO use the corners directly if the object is rectangular
     minx, miny, maxx, maxy = bbox_a.bounds
 
     # Define the four corners of the bounding box in Image A
@@ -501,7 +513,41 @@ def project_bounding_box(bbox_a: Polygon, M: np.ndarray) -> Polygon:
     # Create a new polygon with the transformed corners in Image B
     bbox_b = Polygon(transformed_corners)
 
+    if isinstance(label, ImageLabel):
+        label.bbox_polygon = bbox_b
+        return label
+
     return bbox_b
+
+
+def project_annotations_to_crop(buffer: shapely.Polygon,
+                                imagelabels: list[ImageLabel]):
+    """
+    TODO this is pretty much the code in 'project_bounding_box' but with a different signature
+    :param pc:
+    :param patch_size:
+    :param image:
+    :return:
+    """
+    # create a buffer around the centroid of the polygon
+    assert isinstance(buffer, shapely.Polygon)
+    assert all([isinstance(il, ImageLabel) for il in imagelabels])
+
+    minx, miny, maxx, maxy = buffer.bounds
+
+    obj_in_crop = [copy.copy(il) for il in imagelabels if il.centroid.within(buffer)]  # all objects withing the buffer
+    cropped_annotations = [l for l in obj_in_crop if buffer.contains(l.centroid)]
+
+    a, b, d, e = 1.0, 0.0, 0.0, 1.0  # Scale and rotate
+    xoff, yoff = -minx, -miny  # Translation offsets
+
+    # Apply the affine transformation to the polygon to reproject into image coordinates
+    transformation_matrix = [a, b, d, e, xoff, yoff]
+
+    for ca in cropped_annotations:
+        ca.bbox_polygon = affine_transform(ca.bbox_polygon, transformation_matrix)
+
+    return cropped_annotations, buffer
 
 
 class ImagePatchFinder(object):
@@ -546,7 +592,7 @@ class ImagePatchFinder(object):
 
 
     def find_patch(self,
-               output_path = Path("./output")):
+               output_path = Path("./output"), similarity_threshold=0.1):
         """
         Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
         TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
@@ -559,7 +605,7 @@ class ImagePatchFinder(object):
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path, Path(self.large_image_path))
         logger.info(f"Keypoints found. Normalised similarity: {normalised_sim}")
 
-        if normalised_sim < 0.1:
+        if normalised_sim < similarity_threshold:
             logger.error("The template is not in the image")
             return False
 
@@ -618,10 +664,13 @@ class ImagePatchFinder(object):
         self.warped_image_B = cv2.warpPerspective(self.large_image, self.M_,
                                                   dsize=(self.template_image.shape[1], self.template_image.shape[0]))
 
+
         matched_source_image = f"warped_source_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
 
         rotated_cropped_image_bbox_path = output_path / matched_source_image
         cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
 
         return rotated_cropped_image_bbox_path
+
+
 

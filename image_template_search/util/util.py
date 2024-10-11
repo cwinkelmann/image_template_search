@@ -1,3 +1,4 @@
+import typing
 from pathlib import Path
 import hashlib
 
@@ -24,6 +25,9 @@ import matplotlib.patches as patches
 import matplotlib.axes as axes
 from shapely import Polygon
 from shapely.geometry import box, Point
+from PIL import Image
+from shapely.geometry import Polygon
+from typing import List, Tuple
 
 import os
 import joblib
@@ -115,7 +119,7 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapel
 
 
 def visualise_image(image_path: Path = None,
-                    image: Image = None,
+                    image: typing.Union[PIL.Image, np.ndarray] = None,
                     output_file_name: Path = None,
                     show: bool = False,
                     title: str = "original image",
@@ -131,6 +135,8 @@ def visualise_image(image_path: Path = None,
     :return:
     """
 
+    if image is not None and isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
 
     if ax is None:
         fig, ax = plt.subplots(1, figsize=figsize, dpi=dpi)  # TODO use the shape of imr to get the right ration
@@ -154,7 +160,7 @@ def visualise_image(image_path: Path = None,
 
 def create_box_around_point(center: Point, a: float, b: float) -> box:
     """
-
+    create a bounding box around a point
     """
     x_center, y_center = center.x, center.y
 
@@ -168,12 +174,9 @@ def create_box_around_point(center: Point, a: float, b: float) -> box:
     return box(minx, miny, maxx, maxy)
 
 
-from PIL import Image
-from shapely.geometry import Polygon
-from typing import List, Tuple
 
 
-def crop_objects_from_image(image: Image, bbox_polygons: List[Polygon]) -> List[Image]:
+def crop_objects_from_image(image: typing.Union[Image, np.ndarray], bbox_polygons: List[Polygon]) -> List[Image]:
     """
     Crop the rectangular polygons from the image and return them as a list of cropped images.
 
@@ -182,6 +185,8 @@ def crop_objects_from_image(image: Image, bbox_polygons: List[Polygon]) -> List[
     :return: List of cropped PIL images
     """
     cropped_images = []
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
 
     for polygon in bbox_polygons:
         # Ensure the polygon is a rectangle
