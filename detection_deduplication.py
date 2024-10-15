@@ -1,3 +1,8 @@
+
+"""
+@depreated delete!
+
+"""
 import copy
 from pathlib import Path
 
@@ -275,7 +280,8 @@ def demo_template():
             template_labels=objs_in_template[i],
             other_images=other_images,
             images_path=images_path,
-            output_path=output_path)
+            output_path=output_path
+        )
 
         # we have N template crops and N covered objects
         logger.info(f"Found {len(template_crops)} template crops and {len(covered_objects)} covered objects")

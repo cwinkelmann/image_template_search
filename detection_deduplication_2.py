@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -31,7 +32,9 @@ def cutout_detection_deduplication(source_image_path: Path,
     covered_objects = []
     template_crops = []
 
-    for large_image in other_images:
+    for dest_image in other_images:
+        # FIXME this is a bit of a hack, because this image should not be changed, but somewhere it is
+        large_image = copy.deepcopy(dest_image)
         logger.info(f"finding template patch in {large_image.image_name}")
 
         ipf = ImagePatchFinder(template_path=source_image_path,
@@ -54,9 +57,17 @@ def cutout_detection_deduplication(source_image_path: Path,
             if frame_polygon.contains(ipf.proj_template_polygon):
                 logger.info(f"The frame is within the template polygon")
 
-
+                ax_w = visualise_image(image=ipf.warped_image_B, show=False, title=f"Warped {large_image.image_name}",
+                                       dpi=75)
+                ax_w = visualise_polygons([ipf.template_polygon], color="white", show=False, ax=ax_w, linewidth=2.5)
+                # TODO visualise the template labels because they are not shown and the ground truth
                 # project B annotations to template
                 large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
+                ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red", show=False, ax=ax_w,
+                                          linewidth=2.5,
+                                          filename=output_path / f"annotations_{large_image.image_name}_{template_image_path.stem}.jpg")
+
+
 
                 if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:
                     logger.warning(f"template object is not in the image {large_image.image_name}")
@@ -82,8 +93,8 @@ def cutout_detection_deduplication(source_image_path: Path,
                                            dpi=75)
 
                     ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
-                                              color="red", show=True, ax=ax_c,
-                                              linewidth=7.5, filename=output_path / f"cropped_{large_image.image_name}_{len(large_image_labels_containing)}_objects.jpg")
+                                              color="red", show=False, ax=ax_c,
+                                              linewidth=4.5, filename=output_path / f"cropped_{large_image.image_name}_{template_image_path.stem}_{len(large_image_labels_containing)}_objects.jpg")
 
                     i = Image(image_name=warped_path.name, height=frame_height, width=frame_width, labels=large_image_labels_containing)
 
@@ -93,6 +104,53 @@ def cutout_detection_deduplication(source_image_path: Path,
                 logger.warning(f"The frame is not within the template polygon")
 
     return covered_objects
+
+def find_annotated_template_matches(images_path: Path,
+                                    ann_template_image: Image,
+                                    other_images: list[Image], output_path: Path):
+    """
+    project every object on other images to the template image
+
+    :param images_path:
+    :param ann_template_image:
+    :param other_images:
+    :param output_path:
+    :return:
+    """
+    covered_objects = []
+
+    p_image = PILImage.open(
+        images_path / ann_template_image.dataset_name / ann_template_image.image_name)  # Replace with your image file path
+
+    objs_in_template, template_extents = find_objects(ann_template_image, patch_size=1280)
+
+    templates = crop_objects_from_image(image=p_image,
+                                        bbox_polygons=template_extents)
+
+    for i, t in enumerate(templates):
+        template_image_path = output_path / f"{ann_template_image.image_name}_template_{i}.jpg"
+        t.save(template_image_path)  # a bit
+
+        ax_q = visualise_image(image=t, show=False,
+                               title=f"{ann_template_image.image_name} template {i} with annotations")
+        visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
+                           filename=output_path / f"{ann_template_image.image_name}_template_ann_{i}.jpg",
+                           show=False, ax=ax_q, linewidth=4.5)
+
+        covered_objects.extend(cutout_detection_deduplication(
+            source_image_path=images_path / ann_template_image.dataset_name / ann_template_image.image_name,
+            template_image_path=template_image_path,
+            cutout_polygon=template_extents[i],
+            template_labels=objs_in_template[i],
+            other_images=other_images,
+            images_path=images_path,
+            output_path=output_path)
+        )
+
+        # we have N template crops and N covered objects
+        logger.info(f"Found  {len(covered_objects)} covered objects")
+    return covered_objects
+
 
 def demo_template():
     """
@@ -104,50 +162,30 @@ def demo_template():
     images_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
     output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
 
-    ann_template_image = hA.images[0]
-    ann_template_image = hA.images[1]
+    hA.images = sorted(hA.images, key=lambda obj: obj.image_name)
+    # hA.images = hA.images[0:5]  # take only the first 8 images
 
+    # TODO get only the nearest images to the template image
 
-    # other_images = [hA.images[14]]  # take a single image which covers perfectly
-    # other_images = hA.images[14:17]  # take testing subset
-    # other_images = [i for i in hA.images if i.image_name == "DJI_0058.JPG"] # take testing subset
-    other_images = hA.images  # take all
+    for i, ann_template_image in enumerate(hA.images):
+        # ann_template_image = hA.images[1]
 
-    p_image = PILImage.open(
-        images_path / ann_template_image.dataset_name / ann_template_image.image_name)  # Replace with your image file path
+        # other_images = [hA.images[14]]  # take a single image which covers perfectly
+        # other_images = hA.images[14:17]  # take testing subset
+        # other_images = [i for i in hA.images if i.image_name == "DJI_0058.JPG"] # take testing subset
+        # other_images = hA.images  # take all
+        # other_images = [i for i in hA.images if i.image_name != ann_template_image.image_name]
+        other_images = hA.images[i+1:]
+        ## FIXME: ensure when i.e. 49 to 50 was already matched, that 50 to 49 is not matched again ebcause it is reduandant
 
-    # FIXME this should not return 14 extents if there 14 objects in the image
-    objs_in_template, template_extents = find_objects(ann_template_image, patch_size=1280)
+        # TODO feed only images in there which are nearby
+        covered_objects = find_annotated_template_matches(images_path, ann_template_image, other_images, output_path)
+        with open(output_path / f"image_data_{ann_template_image.image_name}.json", 'w') as json_file:
+            # Serialize the list of Pydantic objects to a list of dictionaries
+            image_data_dict_list = [json.loads(image_data.json()) for image_data in covered_objects]
 
-    # crop
-    templates = crop_objects_from_image(image=p_image,
-                                        bbox_polygons=template_extents)  # TODO refactor this
-
-    for i, t in enumerate(templates):
-
-        template_image_path = output_path / f"{ann_template_image.image_name}_template_{i}.jpg"
-        t.save(template_image_path)  # a bit
-
-        ax_q = visualise_image(image=t, show=False, title=f"template {i} with annotations", output_file_name=None)
-        visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
-                           filename=output_path / f"{ann_template_image.image_name}_template_ann_{i}.jpg",
-                           show=True, ax=ax_q, linewidth=4.5)
-
-
-
-        covered_objects = cutout_detection_deduplication(
-            source_image_path=images_path / ann_template_image.dataset_name / ann_template_image.image_name,
-            template_image_path=template_image_path,
-            cutout_polygon=template_extents[i],
-            template_labels=objs_in_template[i],
-            other_images=other_images,
-            images_path=images_path,
-            output_path=output_path)
-
-        # we have N template crops and N covered objects
-        logger.info(f"Found  {len(covered_objects)} covered objects")
-
-
+            # Save the list of dictionaries to a JSON file
+            json.dump(image_data_dict_list, json_file, indent=4)
 
 
 if __name__ == '__main__':
