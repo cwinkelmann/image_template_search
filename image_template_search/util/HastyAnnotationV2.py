@@ -44,7 +44,7 @@ class Keypoint(BaseModel):
 
 
 class ImageLabel(BaseModel):
-    id: str | int = Field(default=uuid.uuid4(), alias='id')
+    id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='id')
     class_name: str = Field(alias='class_name')
     bbox: Optional[List[int]] = Field(None, alias='bbox')
     polygon: Optional[List[List[int]]] = Field(default=None) # A list of points that make up the polygon
@@ -97,7 +97,7 @@ class ImageLabel(BaseModel):
         self.bbox = [int(value.bounds[0]), int(value.bounds[1]), int(value.bounds[2]), int(value.bounds[3])]
 
 class Image(BaseModel):
-    image_id: typing.Union[str | int] = Field(default=uuid.uuid4(), alias='image_id')
+    image_id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='image_id')
     image_name: str = Field(alias='image_name', description="Name of the image file")
     dataset_name: Optional[str] = Field(default=None, alias='dataset_name')
     ds_image_name: Optional[str] = Field(default=None)
@@ -108,13 +108,6 @@ class Image(BaseModel):
     labels: List[ImageLabel]
     image_mode: Optional[str] = None
 
-
-
-class ImageCounts(BaseModel):
-    image_id: str | int = Field(default=uuid.uuid4(), alias='image_id')
-    image_name: str = Field(alias='image_name', description="Name of the image file")
-    dataset_name: Optional[str] = Field(alias='dataset_name')
-    labels: Dict[str, int]
 
 
 class HastyAnnotationV2(BaseModel):
@@ -133,7 +126,6 @@ class HastyAnnotationV2_flat(BaseModel):
     export_date: datetime
     label_classes: List[LabelClass]
 
-    # images: List[Image]
     image_id: str | int = Field(default=uuid.uuid4(), alias='image_id')
     image_name: str
     dataset_name: str

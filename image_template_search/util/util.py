@@ -17,15 +17,13 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from PIL import Image
 from loguru import logger
 from matplotlib import pyplot as plt
 import matplotlib.axis as axis
 import matplotlib.patches as patches
 import matplotlib.axes as axes
-from shapely import Polygon
 from shapely.geometry import box, Point
-from PIL import Image
+from PIL import Image as PILImage
 from shapely.geometry import Polygon
 from typing import List, Tuple
 
@@ -119,7 +117,7 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapel
 
 
 def visualise_image(image_path: Path = None,
-                    image: typing.Union[PIL.Image, np.ndarray] = None,
+                    image: typing.Union[PILImage, np.ndarray] = None,
                     output_file_name: Path = None,
                     show: bool = False,
                     title: str = "original image",
@@ -136,12 +134,12 @@ def visualise_image(image_path: Path = None,
     """
 
     if image is not None and isinstance(image, np.ndarray):
-        image = Image.fromarray(image)
+        image = PILImage.fromarray(image)
 
     if ax is None:
         fig, ax = plt.subplots(1, figsize=figsize, dpi=dpi)  # TODO use the shape of imr to get the right ration
     if image_path is not None:
-        image = Image.open(image_path)
+        image = PILImage.open(image_path)
     imr = np.array(image, dtype=np.uint8)
     ax.imshow(imr)
     ax.set_title(title)
@@ -176,7 +174,7 @@ def create_box_around_point(center: Point, a: float, b: float) -> box:
 
 
 
-def crop_objects_from_image(image: typing.Union[Image, np.ndarray], bbox_polygons: List[Polygon]) -> List[Image]:
+def crop_objects_from_image(image: typing.Union[PILImage, np.ndarray], bbox_polygons: List[Polygon]) -> List[PILImage]:
     """
     Crop the rectangular polygons from the image and return them as a list of cropped images.
 
@@ -184,9 +182,10 @@ def crop_objects_from_image(image: typing.Union[Image, np.ndarray], bbox_polygon
     :param bbox_polygons: List of rectangular Shapely polygons representing bounding boxes
     :return: List of cropped PIL images
     """
+    logger.warning("make Sure when bounding boxes overlap the objects are not returned twice")
     cropped_images = []
     if isinstance(image, np.ndarray):
-        image = Image.fromarray(image)
+        image = PILImage.fromarray(image)
 
     for polygon in bbox_polygons:
         # Ensure the polygon is a rectangle

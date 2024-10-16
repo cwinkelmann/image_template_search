@@ -5,25 +5,23 @@ import copy
 import gc
 import math
 import pickle
+import random
 import typing
+from pathlib import Path
 
 import PIL.Image
+import matplotlib.pyplot as plt
+import numpy as np
 import shapely
 import torch
 from loguru import logger
-from pathlib import Path
-import cv2
-import matplotlib.pyplot as plt
-import numpy as np
-import random
-
 from shapely.affinity import affine_transform
 
 from image_template_search.image_rasterization import tile_large_image
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
     persist_descriptors, persist_keypoints
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
-from image_template_search.util.util import get_image_id, cache_to_disk, create_box_around_point
+from image_template_search.util.util import get_image_id, cache_to_disk
 from lightglue import LightGlue, SIFT
 from lightglue.utils import load_image, rbd
 
@@ -55,7 +53,7 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
         with open(keypooints_cache_path, 'rb') as f:
             kp2 = pickle.load(f)
             kp2 = [cv2.KeyPoint(x=pt[0], y=pt[1], size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
-                               class_id=pt[6]) for pt in kp2]
+                                class_id=pt[6]) for pt in kp2]
         with open(descriptors_cache_path, 'rb') as f:
             des2 = pickle.load(f)
 
@@ -107,7 +105,6 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
     return kp2, des2
 
 
-
 @cache_to_disk(cache_dir="similarity_cache")
 def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
@@ -126,7 +123,7 @@ def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Te
     total_pixels = img_norm.shape[1] * img_norm.shape[2]
 
     if (image1_T.shape[1] > 1000 and image1_T.shape[2] > 1000 and not torch.all(image1_T == 0)
-        and (black_pixels + white_pixels) / total_pixels < 0.5) :
+            and (black_pixels + white_pixels) / total_pixels < 0.5):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 'mps', 'cpu'
         torch.set_grad_enabled(False)
 
@@ -147,8 +144,8 @@ def get_similarity(image0: Path, image1: Path) -> (float, torch.Tensor, torch.Te
         # get matched keypoints only
         m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
-        del(image1_T)
-        del(image0_T)
+        del (image1_T)
+        del (image0_T)
         gc.collect()
         return normalised_sim, m_kpts0, m_kpts1
 
@@ -184,7 +181,7 @@ def find_rotation_gen(m_kpts0: np.ndarray,
 
 def find_patch(template_path: Path,
                large_image_path: Path,
-               output_path = Path("./output")):
+               output_path=Path("./output")):
     """
     Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
     TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
@@ -197,7 +194,7 @@ def find_patch(template_path: Path,
     normalised_sim, m_kpts0, m_kpts1 = get_similarity(template_path, Path(large_image_path))
     logger.info(f"normalised_sim: {normalised_sim}")
 
-    fx = 1 # TODO clarify if this is needed
+    fx = 1  # TODO clarify if this is needed
     fy = 1
 
     if not isinstance(output_path, Path):
@@ -235,13 +232,12 @@ def find_patch(template_path: Path,
     large_image_l = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
     large_image_l = cv2.resize(large_image_l, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
 
-
     plt.imshow(large_image_l, 'gray')
     fig.savefig(output_path / f"t_{template_identifier}_b{large_image_identifier}_large_image_footprint.jpg")
     plt.show()
 
     # TODO class variable
-    theta = - math.atan2(M[0,1], M[0,0]) * 180 / math.pi
+    theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
     print(f"The camera rotated: {round(theta, 2)} degrees")
 
     # TODO class variable
@@ -273,7 +269,7 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
                      tile_size_y=1200,
                      tile_base_path=Path("./"),
                      cache_path=Path("./cache"),
-                     MIN_MATCH_COUNT = 50, visualise=False) -> np.ndarray:
+                     MIN_MATCH_COUNT=50, visualise=False) -> np.ndarray:
     """
     TODO refactor the parameters
     TODO tile from the center as well
@@ -298,8 +294,6 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
     fy = 1
     # keep 70% of the keypoints and descriptors
     keepers = 100
-
-
 
     large_image = cv2.imread(large_image_path,
                              cv2.IMREAD_COLOR)
@@ -365,7 +359,6 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
     except Exception as e:
         logger.error("Not enough matches are found - {}".format(len(matches)))
 
-
     if len(good) > MIN_MATCH_COUNT:
         src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
         dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
@@ -396,7 +389,7 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
 
         if visualise:
             plt.imshow(large_image, 'gray')
-            fig.savefig(output_path / "large_image_footprint.jpg") # TODO give it a good name
+            fig.savefig(output_path / "large_image_footprint.jpg")  # TODO give it a good name
             plt.show()
 
             draw_params = dict(matchColor=(0, 255, 0),  # Draw matches in green color
@@ -408,7 +401,6 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
             plt.imshow(img_matches, 'gray')
             fig.savefig(output_path / "large_image_match.jpg")
             plt.show()
-
 
         theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
         print(f"The camera rotated: {round(theta, 2)} degrees")
@@ -441,7 +433,7 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
 
 
 def find_patch_stacked(template_path, large_image_paths, output_path,
-                       tile_path, cache_path, MIN_MATCH_COUNT = 50,
+                       tile_path, cache_path, MIN_MATCH_COUNT=50,
                        tile_size_x=1500, tile_size_y=1500,
                        visualise=False):
     """
@@ -573,9 +565,13 @@ class ImagePatchFinder(object):
     mask: np.ndarray
     theta: float
 
-
-
     def __init__(self, template_path, template_polygon, large_image_path):
+        """
+
+        :param template_path: The image which is to be found in the large image
+        :param template_polygon: The footprint of the template image
+        :param large_image_path:
+        """
         self.template_image = None
         self.warped_image_B = None
         self.proj_template_polygon = None
@@ -593,7 +589,8 @@ class ImagePatchFinder(object):
         return self.find_patch()
 
     def find_patch(self,
-               output_path = Path("./output"), similarity_threshold=0.1):
+                   output_path=Path("./output"),
+                   similarity_threshold=0.1):
         """
         Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
         TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
@@ -602,43 +599,27 @@ class ImagePatchFinder(object):
         :param output_path:
         :return:
         """
-        logger.info(f"Extracting Keypoints from query and source images")
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path, Path(self.large_image_path))
-        logger.info(f"Keypoints found. Normalised similarity: {normalised_sim}")
 
         if normalised_sim < similarity_threshold:
-            logger.error("The template is not in the image")
+            logger.warning("The template is not in the image")
             return False
 
         if not isinstance(output_path, Path):
             output_path = Path(output_path)
 
-        logger.info(f"findHomography of both images")
         M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
                                                m_kpts1.cpu().numpy(),
                                                image_name=self.large_image_path)
-        logger.info("Homography found")
         self.M = M
         self.M_ = np.linalg.inv(M)
         self.mask = mask
 
-        # self.footprint = footprint
-
-        # h, w, c = self.large_image_shape # TODO prevent reading the image again
-        #pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
-        #                                                                            2)  # This is the box of the query image
-
-        # dst = cv2.perspectiveTransform(pts, M)
-
-        # TODO transform the footprint of the template to the matched other image
         self.proj_template_polygon = project_bounding_box(self.template_polygon, M)
 
-
-        # draw the matches outer box
-        # footprint = np.int32(dst.reshape(4, 2))
-        # footprint = shapely.Polygon(footprint.reshape(4, 2))
         self.footprint = footprint
 
+        # calculate the rotation of the camera
         self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
         logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
 
@@ -646,7 +627,7 @@ class ImagePatchFinder(object):
 
     def project_image(self, output_path):
         """
-        Project the template image on the large image
+        Project large image to the footprint of the template image
         :return:
         """
 
@@ -657,21 +638,15 @@ class ImagePatchFinder(object):
         self.large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
         self.large_image_shape = self.large_image.shape
 
-
-        rotated_cropped_image_bbox = cv2.warpPerspective(self.large_image,
-                                                         self.M_,
-                                                         dsize=(self.template_image.shape[1], self.template_image.shape[0]))
-
-        self.warped_image_B = cv2.warpPerspective(self.large_image, self.M_,
-                                                  dsize=(self.template_image.shape[1], self.template_image.shape[0]))
-
+        # warp the other large image to the template image
+        self.warped_image_B = cv2.warpPerspective(self.large_image,
+                                                  self.M_,
+                                                  dsize=(
+                                                      self.template_image.shape[1], self.template_image.shape[0]))
 
         matched_source_image = f"warped_source_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
 
-        rotated_cropped_image_bbox_path = output_path / matched_source_image
-        cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+        warped_other_image_path = output_path / matched_source_image
+        cv2.imwrite(str(warped_other_image_path), cv2.cvtColor(self.warped_image_B, cv2.COLOR_RGB2BGR))
 
-        return rotated_cropped_image_bbox_path
-
-
-
+        return warped_other_image_path

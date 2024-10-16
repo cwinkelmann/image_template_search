@@ -1,4 +1,5 @@
 [tool.pytest.ini_options]
 pythonpath = [
-  "image_template_search"
+  ".",
+  "LightGlue"
 ]
