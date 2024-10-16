@@ -273,7 +273,7 @@ def find_patch_tiled(template_path: Path, large_image_path: Path,
                      tile_size_y=1200,
                      tile_base_path=Path("./"),
                      cache_path=Path("./cache"),
-                     MIN_MATCH_COUNT = 50, visualise=False):
+                     MIN_MATCH_COUNT = 50, visualise=False) -> np.ndarray:
     """
     TODO refactor the parameters
     TODO tile from the center as well
@@ -458,6 +458,7 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
     crops = []
 
     for large_image_path in large_image_paths:
+        logger.info(f"finding patch in {large_image_path}")
         crop = find_patch_tiled(template_path,
                                 large_image_path,
                                 output_path=output_path,
@@ -467,6 +468,8 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
 
         if isinstance(crop, np.ndarray):
             crops.append(crop)
+            im = PIL.Image.fromarray(crop)
+            im.save(output_path / f"crop_{large_image_path.stem}_t_{template_path.stem}.jpeg")
         else:
             # no match
             pass
@@ -551,6 +554,9 @@ def project_annotations_to_crop(buffer: shapely.Polygon,
 
 
 class ImagePatchFinder(object):
+    """
+    find a patch on an image in another image and calculate the homography between the two
+    """
 
     footprint: shapely.Polygon
     template_path: Path
@@ -583,14 +589,8 @@ class ImagePatchFinder(object):
         self.large_image_path = large_image_path
         self.matched_templates = []
 
-
-
-
-        # TODO integrate the simple functions so the code is rather wrapped and seperated
-
     def __call__(self, *args, **kwargs):
         return self.find_patch()
-
 
     def find_patch(self,
                output_path = Path("./output"), similarity_threshold=0.1):
