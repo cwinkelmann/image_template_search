@@ -1,10 +1,12 @@
 import tempfile
 import unittest
 from pathlib import Path
+from time import sleep
 
 import numpy as np
 
 from image_template_search.image_similarity import find_patch, find_patch_tiled, find_patch_stacked
+from image_template_search.util.util import visualise_image
 
 
 class ImageSimilarityTestCase(unittest.TestCase):
@@ -14,11 +16,58 @@ class ImageSimilarityTestCase(unittest.TestCase):
         :return:
         """
 
-        template_path = Path(f"./data/crop_0.jpg")
+        template_path = Path(f"./data/crop_0_512.jpg")
         large_image_path = Path(f'./data/DJI_0019.JPG')
 
         output_path = Path("./output")
         crop = find_patch(template_path, large_image_path, output_path=output_path)
+
+        ax_w = visualise_image(image=crop, show=True, title=f"Template Image",
+                               dpi=75)
+        ax_w = visualise_image(image=crop, show=True, title=f"Matched Image",
+                               dpi=75)
+
+        self.assertTrue(isinstance(crop, np.ndarray))  # add assertion here
+        self.assertEqual((512, 512, 3), crop.shape, "The crop patch should be 512x512x3")
+
+
+    def test_template_images_search_2(self):
+        """
+        Find a small patch on different other image
+        :return:
+        """
+
+        template_path_640 = Path(f"./data/template_source_DJI_0049.640.jpg")
+        template_path_1800 = Path(f"./data/template_source_DJI_0049.1280.jpg")
+
+        # template_path = template_path_1280
+        template_path = template_path_640
+        large_image_path = Path(f'./data/DJI_0058.JPG')
+
+        # template_path = Path(f"./data/crop_0_512.jpg")
+        # large_image_path = Path(f'./data/DJI_0019.JPG')
+
+        cache_dir = Path("./cache") # temporary hack to speed up testing
+        output_path = Path("./output")
+
+        # This does not work at all when the patch is 640x640
+        crop, footprint = find_patch(template_path, large_image_path, output_path=output_path)
+
+        # # TODO This method isn't working very well maybe because of OpenCV version
+        # crop = find_patch_tiled(template_path_640,
+        #                         large_image_path,
+        #                         tile_size_x=700,
+        #                         tile_size_y=700,
+        #                         output_path=output_path,
+        #                         cache_path=cache_dir, MIN_MATCH_COUNT=20)
+
+        ax_w = visualise_image(image_path=template_path, show=True, title=f"Template Image",
+                               dpi=75)
+
+        ax_w = visualise_image(image=crop, show=True, title=f"Matched Image",
+                               dpi=75)
+
+        sleep(1)
 
         self.assertTrue(isinstance(crop, np.ndarray))  # add assertion here
         self.assertEqual((512, 512, 3), crop.shape, "The crop patch should be 512x512x3")

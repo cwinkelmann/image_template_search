@@ -52,13 +52,13 @@ def cache_to_disk(cache_dir="cache"):
             # Check if cache exists
             if os.path.exists(cache_file):
                 # Load cached result
-                logger.info(f"Loading cached result for {image0} and {image1}")
+                logger.info(f"Loading cached result for {image0.stem} and {image1.stem}")
                 return joblib.load(cache_file)
 
             # Call the function and cache the result
             result = func(image0, image1, *args, **kwargs)
             joblib.dump(result, cache_file)
-            logger.info(f"Cached result to {cache_file}")
+            logger.info(f"Cached result to {cache_file} for {image0.stem} and {image1.stem}")
 
             return result
         return wrapper
@@ -171,6 +171,37 @@ def create_box_around_point(center: Point, a: float, b: float) -> box:
     # Create a box with these bounds
     return box(minx, miny, maxx, maxy)
 
+def calculate_nearest_border_distance(centroids: list[shapely.Point], frame_width, frame_height):
+    """
+    Calculate the distance from each centroid to the nearest border of the frame.
+
+    Parameters:
+    - centroids: List of tuples [(x1, y1), (x2, y2), ...] representing centroid coordinates.
+    - frame_width: Width of the frame (maximum x value).
+    - frame_height: Height of the frame (maximum y value).
+
+    Returns:
+    - List of distances corresponding to each centroid.
+    """
+    distances = []
+    for idx, p in enumerate(centroids):
+        # Distances to each border
+        distance_left = p.x  # Distance to x = 0
+        distance_right = frame_width - p.x  # Distance to x = frame_width
+        distance_top = p.y  # Distance to y = 0
+        distance_bottom = frame_height - p.y  # Distance to y = frame_height
+
+        # Nearest distance
+        nearest_distance = min(distance_left, distance_right, distance_top, distance_bottom)
+
+        distances.append(nearest_distance)
+        print(f"Centroid {idx + 1} at ({p.x}, {p.y}):")
+        print(f"  Distance to Left Border: {distance_left}")
+        print(f"  Distance to Right Border: {distance_right}")
+        print(f"  Distance to Top Border: {distance_top}")
+        print(f"  Distance to Bottom Border: {distance_bottom}")
+        print(f"  Nearest Distance to Border: {nearest_distance}\n")
+    return distances
 
 
 
