@@ -33,13 +33,60 @@ import torch
 from functools import wraps
 from pathlib import Path
 import hashlib
+import hydra
+from omegaconf import DictConfig
+from pathlib import Path
 
-def cache_to_disk(cache_dir="cache"):
+from conf.config_dataclass import CacheConfig
+
+
+def feature_extractor_cache():
     """
     Decorator to cache the results of the function to disk.
     :param cache_dir: Directory where cached results will be stored
     """
+
     def decorator(func):
+        cache_dir = CacheConfig.cache_path
+
+        @wraps(func)
+        def wrapper(image_path: Path, *args, **kwargs):
+            # Ensure cache directory exists
+            os.makedirs(cache_dir, exist_ok=True)
+
+            # Create a unique cache file name based on the inputs (hash the paths)
+            cache_key = hashlib.md5(f"{image_path}".encode()).hexdigest()
+            cache_file = os.path.join(cache_dir, f"{cache_key}_feats.pkl")
+
+            # Check if cache exists
+            if os.path.exists(cache_file):
+                # Load cached result
+                logger.info(f"Loading cached result for {image_path.stem}")
+                return joblib.load(cache_file)
+
+            # Call the function and cache the result
+            result = func(image_path, *args, **kwargs)
+            joblib.dump(result, cache_file)
+            logger.info(f"Cached result to {cache_file} for {image_path.stem}")
+
+            return result
+        return wrapper
+    return decorator
+
+
+def generic_cache_to_disk():
+
+
+
+def cache_to_disk():
+    """
+    Decorator to cache the results of the function to disk.
+    :param cache_dir: Directory where cached results will be stored
+    """
+
+    def decorator(func):
+        cache_dir = CacheConfig.cache_path
+
         @wraps(func)
         def wrapper(image0: Path, image1: Path, *args, **kwargs):
             # Ensure cache directory exists
@@ -195,12 +242,7 @@ def calculate_nearest_border_distance(centroids: list[shapely.Point], frame_widt
         nearest_distance = min(distance_left, distance_right, distance_top, distance_bottom)
 
         distances.append(nearest_distance)
-        print(f"Centroid {idx + 1} at ({p.x}, {p.y}):")
-        print(f"  Distance to Left Border: {distance_left}")
-        print(f"  Distance to Right Border: {distance_right}")
-        print(f"  Distance to Top Border: {distance_top}")
-        print(f"  Distance to Bottom Border: {distance_bottom}")
-        print(f"  Nearest Distance to Border: {nearest_distance}\n")
+        logger.info(f"  Nearest Distance to Border: {nearest_distance}\n")
     return distances
 
 

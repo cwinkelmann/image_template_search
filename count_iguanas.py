@@ -4,13 +4,48 @@ Count igunas based on annotations which are in a stack of images
 from pathlib import Path
 from statistics import mean
 
-from image_template_search.util.HastyAnnotationV2 import hA_from_file
+from loguru import logger
+from shapely import Polygon
+
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, get_flat_df
 
 annotation_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
 annotation_0049_t0 = annotation_path / "template_annotations_DJI_0049.JPG_0.json"
 annotation_0049_t1 = annotation_path / "template_annotations_DJI_0049.JPG_1.json"
 
 anno = [annotation_0049_t0, annotation_0049_t1]
+
+patch_size = 1280
+
+# How many igunanas exist in the ground truth
+hA = hA_from_file(
+        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_10.json"))
+
+hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
+                                                      "DJI_0050.JPG", "DJI_0051.JPG",
+                                                      "DJI_0052.JPG",
+                                                      "DJI_0053.JPG",
+                                                      "DJI_0054.JPG", "DJI_0055.JPG",
+                                                      "DJI_0056.JPG",
+                                                      "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
+                                                      "DJI_0060.JPG",
+                                                      "DJI_0061.JPG",
+                                                      "DJI_0062.JPG",
+                                                      "DJI_0063.JPG",  # First image with ID 7
+                                                      "DJI_0064.JPG",
+                                                      "DJI_0065.JPG",
+                                                      ]]
+
+bd_th = int(patch_size // 2)
+for i, source_image in enumerate(hA.images):
+    source_image.labels = [l for l in source_image.labels if l.centroid.within(
+        Polygon([(0 + bd_th, bd_th), (source_image.width - bd_th, bd_th),
+                 (source_image.width - bd_th, source_image.height - bd_th), (bd_th, source_image.height - bd_th)]))]
+
+df_hA = get_flat_df(hA)
+
+logger.info(f"There are {df_hA['ID'].nunique()} objects with the IDs {df_hA['ID'].unique()} in the ground truth")
+
 
 for a in anno:
         """ how would I count iguanas in a stack of images with multiple template polygons? """

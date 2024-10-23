@@ -21,7 +21,7 @@ from image_template_search.image_rasterization import tile_large_image
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
     persist_descriptors, persist_keypoints
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
-from image_template_search.util.util import get_image_id, cache_to_disk
+from image_template_search.util.util import get_image_id, cache_to_disk, feature_extractor_cache
 from lightglue import LightGlue, SIFT
 from lightglue.utils import load_image, rbd
 
@@ -116,8 +116,10 @@ import logging
 from lightglue import LightGlue
 # from extraction import SIFT
 # from utils import rbd, load_image  # Assuming these are defined elsewhere
+import hydra
+from omegaconf import DictConfig
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, torch.Tensor, torch.Tensor]:
     """
@@ -244,7 +246,30 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
         logger.warning(f"Image too small or not proper: {image1_T.shape}")
         return 0, torch.tensor([]), torch.tensor([])
 
-@cache_to_disk(cache_dir="similarity_cache") # TODO enable the cache again
+@feature_extractor_cache()
+def extractor_wrapper(image_path: Path, device="cpu") -> typing.Tuple[dict, torch.Tensor]:
+    """
+    Extract features from an image using a given extractor.
+    :param image_path: Path.
+    :param extractor: Feature extractor.
+    :return: Extracted features.
+    """
+
+    extractor = SIFT(max_num_keypoints=15000).eval().to(device)
+    image = load_image(image_path)
+    feats = extractor.extract(image.to(device))
+
+
+    return feats, image
+
+@generic_cache_to_disk()
+def matcher_wrapper(feats0, feats1, device="cpu") -> torch.Tensor:
+    matcher = LightGlue(features="sift").eval().to(device)
+    matches01 = matcher({"image0": feats0, "image1": feats1})
+
+    return matches01
+
+
 def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
     get the similarity between two images
@@ -254,8 +279,17 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
     :return:
     """
 
-    image0_T = load_image(template_image)
-    image1_T = load_image(image1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 'mps', 'cpu'
+    torch.set_grad_enabled(False)
+
+
+    # image0_T = load_image(template_image)
+    logger.info(f"START extracting features from {image1}")
+    feats1, _ = extractor_wrapper(image_path=image1, device=device)
+    logger.info(f"DONE extracting features from {image1}")
+
+    feats0, image1_T  = extractor_wrapper(image_path=template_image, device=device)
+    # image1_T = load_image(image1)
 
     img_norm = image1_T / 255.0 if image1_T.max() > 1 else image1_T
     black_pixels = torch.all(img_norm < 0.1, dim=0).sum()
@@ -264,15 +298,20 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
 
     if (image1_T.shape[1] > 1000 and image1_T.shape[2] > 1000 and not torch.all(image1_T == 0)
             and (black_pixels + white_pixels) / total_pixels < 0.5):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 'mps', 'cpu'
-        torch.set_grad_enabled(False)
 
-        extractor = SIFT(max_num_keypoints=15000).eval().to(device)  # load the extractor
+
+          # load the extractor
         matcher = LightGlue(features="sift").eval().to(device)
 
-        feats1 = extractor.extract(image1_T.to(device))
-        feats0 = extractor.extract(image0_T.to(device))
+        # TODO prevent this to happen again
+        # feats1 = extractor.extract(image1_T.to(device))
+
+        # feats0 = extractor.extract(image0_T.to(device))
+
+        # TODO build a matcher cache which handles I_A, I_B and the other way around I_B, I_A
+        matches01 = matcher_wrapper(feats0=feats0, feats1=feats1)
         matches01 = matcher({"image0": feats0, "image1": feats1})
+
         feats0, feats1, matches01 = [
             rbd(x) for x in [feats0, feats1, matches01]
         ]  # remove batch dimension
@@ -284,9 +323,6 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
         # get matched keypoints only
         m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
-        del (image1_T)
-        del (image0_T)
-        gc.collect()
         return normalised_sim, m_kpts0, m_kpts1
 
     else:

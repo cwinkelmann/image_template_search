@@ -13,6 +13,9 @@ from matplotlib import pyplot as plt
 from shapely import Polygon
 from shapely.affinity import affine_transform
 
+import hydra
+from omegaconf import DictConfig
+
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box, project_annotations_to_crop
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel
 from image_template_search.util.util import visualise_polygons, visualise_image, \
@@ -104,25 +107,20 @@ def cutout_detection_deduplication(source_image_path: Path,
             # Check if the projected template polygon is fully within the frame polygon
             # if frame_polygon.within(ipf.proj_template_polygon):
 
-            ax_w = visualise_image(image=ipf.warped_image_B, show=False, title=f"Warped {large_image.image_name}",
-                                   dpi=75)
-            ax_w = visualise_polygons([frame_polygon], color="blue", show=False,
-                                      ax=ax_w, linewidth=2.5)
-            ax_w = visualise_polygons([ipf.template_polygon], color="white",
-                                      show=True,
-                                      filename=output_path / f"template_{template_image_path.stem}_l_{large_image.image_name}.jpg",
-                                      ax=ax_w, linewidth=2.5)
-
             # if frame_polygon.contains(ipf.proj_template_polygon):
-            if ipf.proj_template_polygon.within(frame_polygon):
+            if ipf.proj_template_polygon.within(frame_polygon) or True: # TODO this should not matter. Even if it is not within, it should be projected
                 logger.info(f"The small template {template_image_path.stem} frame is within the template polygon")
 
 
                 # TODO visualise the template labels because they are not shown and the ground truth
                 # project B annotations to template
                 large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
+                ax_i = visualise_image(image=ipf.warped_image_B, show=False, title=f"Warped with annotations {large_image.image_name}",
+                                       dpi=75)
+                ax_i = visualise_polygons([ipf.template_polygon], color="white",
+                                          ax=ax_i, linewidth=2.5)
                 ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red", show=True,
-                                          ax=ax_w,
+                                          ax=ax_i,
                                           linewidth=2.5,
                                           filename=output_path / f"annotations_large_{large_image.image_name}_{template_image_path.stem}.jpg")
 
@@ -134,11 +132,13 @@ def cutout_detection_deduplication(source_image_path: Path,
                     logger.warning(f"template object is not in the image {large_image.image_name}")
 
                 elif ipf_t.find_patch(similarity_threshold=0.005):
-                    logger.info(f"Found template {template_image_path.stem} object is not in the image {large_image.image_name}")
+                    logger.info(f"Found template {template_image_path.stem} object is in the image {large_image.image_name}")
                     warped_path = ipf_t.project_image(output_path=output_path)
 
                     # project the labels from the large image to the template, therefore using their ids
                     large_image_proj_labels = [project_bounding_box(l, ipf_t.M_) for l in copy.copy(large_image.labels)]
+
+                    # TODO project the labels from the template to the large image.
 
                     xmin, ymin, xmax, ymax = ipf_t.template_polygon.bounds
                     frame_width = xmax - xmin
@@ -172,7 +172,8 @@ def cutout_detection_deduplication(source_image_path: Path,
 
 def find_annotated_template_matches(images_path: Path,
                                     source_image: Image,
-                                    other_images: list[Image], output_path: Path,
+                                    other_images: list[Image],
+                                    output_path: Path,
                                     patch_size = 1280) -> list[Image]:
     """
     project every object on other images to the template image
@@ -197,7 +198,7 @@ def find_annotated_template_matches(images_path: Path,
     for i, t in enumerate(templates):
 
         # Save the templates
-        template_image_path = output_path / f"template_source_{source_image.image_name}_{i}.jpg"
+        template_image_path = output_path / f"template_source_{source_image.image_name}_{i}_{patch_size}.jpg"
         t.save(template_image_path)  # a bit
 
         template_image_ann = Image(image_name=template_image_path.name,
@@ -205,7 +206,7 @@ def find_annotated_template_matches(images_path: Path,
                                    labels=objs_in_template[i])
 
         ax_q = visualise_image(image=t, show=False,
-                               title=f"{source_image.image_name} template {i} with annotations")
+                               title=f"New Objects_{source_image.image_name} template {i} with annotations")
         visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
                            filename=output_path / f"template_ann_{source_image.image_name}_{i}.jpg",
                            show=True, ax=ax_q, linewidth=4.5)
@@ -245,8 +246,9 @@ def demo_template():
 
     known_labels = []
     patch_size = 1280
+    total_object_count = 0
 
-    hA.images = sorted(hA.images, key=lambda obj: obj.image_name)
+    hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG", "DJI_0062.JPG"]]
 
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
@@ -260,18 +262,18 @@ def demo_template():
     #               ]]
 
     hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
-                                                          #"DJI_0050.JPG", "DJI_0051.JPG",
-                                                          #"DJI_0052.JPG",
+                                                          "DJI_0050.JPG", "DJI_0051.JPG",
+                                                          "DJI_0052.JPG",
                                                           "DJI_0053.JPG",
-                                                          # "DJI_0054.JPG", "DJI_0055.JPG",
-                                                          # "DJI_0056.JPG",
-                                                          # "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
-                                                          # "DJI_0060.JPG",
-                                                          #   "DJI_0061.JPG",
-                                                          # "DJI_0062.JPG",
-                                                          # "DJI_0063.JPG", # First image with ID 7
-                                                          # "DJI_0064.JPG",
-                                                          # "DJI_0065.JPG",
+                                                          "DJI_0054.JPG", "DJI_0055.JPG",
+                                                          "DJI_0056.JPG",
+                                                          "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
+                                                          "DJI_0060.JPG",
+                                                          "DJI_0061.JPG",
+                                                          "DJI_0062.JPG",
+                                                          "DJI_0063.JPG", # First image with ID 7
+                                                          "DJI_0064.JPG",
+                                                          "DJI_0065.JPG",
                   ]]
 
 
@@ -300,15 +302,18 @@ def demo_template():
         # TODO this is bigger then the patch size on purpose, How big should it be?
         bd_th = int( (patch_size**2 // 2) ** 0.5 ) # TODO THIS would be the right way to calculate the distance
 
-        # bd_th = int(patch_size // 2)
+        bd_th = int(patch_size // 2)
 
         source_image.labels = [l for l in source_image.labels if l.centroid.within(
             Polygon([(0 + bd_th , bd_th), (source_image.width - bd_th, bd_th),
                      (source_image.width - bd_th, source_image.height - bd_th), (bd_th, source_image.height - bd_th)]))]
 
-        logger.info(f"After edge thresholding in {source_image.labels} in {len(other_images)} images")
+        logger.info(f"After edge thresholding in {len(source_image.labels)} potentially new labels remain on {len(other_images)} images")
         # remove already covered labels from source image
+        logger.info(f"Removing known labels {known_labels} from source image {source_image.image_name} to avoid duplications.")
         source_image.labels = [l for l in source_image.labels if l.id not in known_labels]
+        total_object_count += len(source_image.labels)
+        logger.info(f"Total objects in all images: {total_object_count}")
 
         # other_images = [hA.images[14]]  # take a single image which covers perfectly
         # other_images = hA.images[14:17]  # take testing subset
