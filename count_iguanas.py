@@ -13,7 +13,9 @@ annotation_path = Path("/Users/christian/data/2TB/ai-core/data/detection_dedupli
 annotation_0049_t0 = annotation_path / "template_annotations_DJI_0049.JPG_0.json"
 annotation_0049_t1 = annotation_path / "template_annotations_DJI_0049.JPG_1.json"
 
-anno = [annotation_0049_t0, annotation_0049_t1]
+# anno = [annotation_0049_t0, annotation_0049_t1]
+anno = annotation_path.glob("template_annotations_DJI*.json")
+
 
 patch_size = 1280
 
@@ -21,20 +23,20 @@ patch_size = 1280
 hA = hA_from_file(
         file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_10.json"))
 
-hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
-                                                      "DJI_0050.JPG", "DJI_0051.JPG",
-                                                      "DJI_0052.JPG",
-                                                      "DJI_0053.JPG",
-                                                      "DJI_0054.JPG", "DJI_0055.JPG",
-                                                      "DJI_0056.JPG",
-                                                      "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
-                                                      "DJI_0060.JPG",
-                                                      "DJI_0061.JPG",
-                                                      "DJI_0062.JPG",
-                                                      "DJI_0063.JPG",  # First image with ID 7
-                                                      "DJI_0064.JPG",
-                                                      "DJI_0065.JPG",
-                                                      ]]
+# hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
+#                                                       "DJI_0050.JPG", "DJI_0051.JPG",
+#                                                       "DJI_0052.JPG",
+#                                                       "DJI_0053.JPG",
+#                                                       "DJI_0054.JPG", "DJI_0055.JPG",
+#                                                       "DJI_0056.JPG",
+#                                                       "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
+#                                                       "DJI_0060.JPG",
+#                                                       "DJI_0061.JPG",
+#                                                       "DJI_0062.JPG",
+#                                                       "DJI_0063.JPG",  # First image with ID 7
+#                                                       "DJI_0064.JPG",
+#                                                       "DJI_0065.JPG",
+#                                                       ]]
 
 bd_th = int(patch_size // 2)
 for i, source_image in enumerate(hA.images):
@@ -51,11 +53,13 @@ for a in anno:
         """ how would I count iguanas in a stack of images with multiple template polygons? """
         hA = hA_from_file(
                 file_path=a)
-
+        df_hA_single = get_flat_df(hA)
         numbers = ([len(image.labels) for image in hA.images])
 
         mean_igunas = mean(numbers)
-        print(f"Mean iguanas: {mean_igunas}")
+        # print(f"Mean iguanas: {mean_igunas}")
+        print(f"{hA.images[0].image_name} has {len(hA.images[0].labels)} iguanas")
+        print(f"IDs iguanas: {df_hA_single['ID'].unique()}")
 
 
 

@@ -36,6 +36,7 @@ import hashlib
 import hydra
 from omegaconf import DictConfig
 from pathlib import Path
+from joblib import Memory
 
 from conf.config_dataclass import CacheConfig
 
@@ -61,7 +62,7 @@ def feature_extractor_cache():
             # Check if cache exists
             if os.path.exists(cache_file):
                 # Load cached result
-                logger.info(f"Loading cached result for {image_path.stem}")
+                logger.info(f"Loading cached {func.__name__} result for {image_path.stem}")
                 return joblib.load(cache_file)
 
             # Call the function and cache the result
@@ -75,7 +76,27 @@ def feature_extractor_cache():
 
 
 def generic_cache_to_disk():
+    """
+    Generic caching decorator using Joblib's Memory caching.
 
+    :param cache_dir: Directory where cached results will be stored.
+    """
+
+    def decorator(func):
+        cache_dir = f"{CacheConfig.cache_path}_{func.__name__}"
+        # Set up Joblib memory object
+        memory = Memory(cache_dir, verbose=0)
+        cached_func = memory.cache(func)  # Cache the function using Joblib
+        logger.info(f"Loading cached {func.__name__} from {cache_dir}")
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Call the cached version of the function
+            return cached_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def cache_to_disk():
@@ -94,7 +115,9 @@ def cache_to_disk():
 
             # Create a unique cache file name based on the inputs (hash the paths)
             cache_key = hashlib.md5(f"{image0}{image1}".encode()).hexdigest()
+            cache_key_ = hashlib.md5(f"{image1}{image0}".encode()).hexdigest()
             cache_file = os.path.join(cache_dir, f"{cache_key}.pkl")
+            cache_file_ = os.path.join(cache_dir, f"{cache_key_}.pkl")
 
             # Check if cache exists
             if os.path.exists(cache_file):
@@ -106,6 +129,45 @@ def cache_to_disk():
             result = func(image0, image1, *args, **kwargs)
             joblib.dump(result, cache_file)
             logger.info(f"Cached result to {cache_file} for {image0.stem} and {image1.stem}")
+
+            return result
+        return wrapper
+    return decorator
+
+
+def get_similarity_cache_to_disk():
+    """
+    Decorator to cache the results of the function to disk.
+    :param cache_dir: Directory where cached results will be stored
+    """
+
+    def decorator(func):
+        cache_dir = CacheConfig.cache_path
+
+        @wraps(func)
+        def wrapper(image0: Path, image1: Path, *args, **kwargs):
+            # Ensure cache directory exists
+            os.makedirs(cache_dir, exist_ok=True)
+
+            # Create a unique cache file name based on the inputs (hash the paths)
+            cache_key = hashlib.md5(f"{image0}{image1}".encode()).hexdigest()
+            cache_key_ = hashlib.md5(f"{image1}{image0}".encode()).hexdigest()
+            cache_file = os.path.join(cache_dir, f"{cache_key}_{image0.name}_{image1.name}_find_similarity.pkl")
+            cache_file_ = os.path.join(cache_dir, f"{cache_key_}_{image1.name}_{image0.name}_find_similarity.pkl")
+
+            # Check if cache exists
+            if os.path.exists(cache_file):
+                # Load cached result
+                logger.info(f"Loading cached result for {image0.stem} and {image1.stem}")
+                return joblib.load(cache_file)
+
+            # Call the function and cache the result
+            result = func(image0, image1, *args, **kwargs)
+            normalised_sim, m_kpts0, m_kpts1 = result
+            joblib.dump((normalised_sim, m_kpts0, m_kpts1), cache_file)
+            joblib.dump((normalised_sim, m_kpts1, m_kpts0), cache_file_)
+            logger.info(f"Cached result to {cache_file} for {image0.stem} and {image1.stem}")
+            logger.info(f"Cached result to {cache_file_} for {image1.stem} and {image0.stem}")
 
             return result
         return wrapper
@@ -255,7 +317,6 @@ def crop_objects_from_image(image: typing.Union[PILImage, np.ndarray], bbox_poly
     :param bbox_polygons: List of rectangular Shapely polygons representing bounding boxes
     :return: List of cropped PIL images
     """
-    logger.warning("make Sure when bounding boxes overlap the objects are not returned twice")
     cropped_images = []
     if isinstance(image, np.ndarray):
         image = PILImage.fromarray(image)
