@@ -17,6 +17,7 @@ import torch
 from loguru import logger
 from shapely.affinity import affine_transform
 
+from conf.config_dataclass import CacheConfig
 from image_template_search.image_rasterization import tile_large_image
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
     persist_descriptors, persist_keypoints
@@ -247,8 +248,8 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
         logger.warning(f"Image too small or not proper: {image1_T.shape}")
         return 0, torch.tensor([]), torch.tensor([])
 
-@feature_extractor_cache()
-def extractor_wrapper(image_path: Path, device="cpu") -> typing.Tuple[dict, torch.Tensor]:
+#@feature_extractor_cache()
+def extractor_wrapper(image_path: Path, max_num_keypoints=8000) -> typing.Tuple[dict, torch.Tensor]:
     """
     Extract features from an image using a given extractor.
     :param image_path: Path.
@@ -256,17 +257,17 @@ def extractor_wrapper(image_path: Path, device="cpu") -> typing.Tuple[dict, torc
     :return: Extracted features.
     """
 
-    extractor = SIFT(max_num_keypoints=4000).eval().to(device)
+    extractor = SIFT(max_num_keypoints=max_num_keypoints).eval().to(CacheConfig.device)
     image = load_image(image_path)
-    feats = extractor.extract(image.to(device))
+    feats = extractor.extract(image.to(CacheConfig.device))
 
 
     return feats, image
 
 # @generic_cache_to_disk()
-def matcher_wrapper(feats0, feats1, device="cpu") -> torch.Tensor:
+def matcher_wrapper(feats0, feats1) -> torch.Tensor:
     logger.info(f"Start matching")
-    matcher = LightGlue(features="sift").eval().to(device)
+    matcher = LightGlue(features="sift").eval().to(CacheConfig.device)
     matches01 = matcher({"image0": feats0, "image1": feats1})
     logger.info(f"Done matching")
 
@@ -282,16 +283,16 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
     :return:
     """
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 'mps', 'cpu'
+    device = torch.device("cuda" if torch.cuda.is_available() else CacheConfig.device)  # 'mps', 'cpu'
     torch.set_grad_enabled(False)
 
 
     # image0_T = load_image(template_image)
     logger.info(f"START extracting features from {image1.name}")
-    feats1, _ = extractor_wrapper(image_path=image1, device=device)
+    feats1, _ = extractor_wrapper(image_path=image1)
     logger.info(f"DONE extracting features from {image1.name}")
 
-    feats0, image1_T  = extractor_wrapper(image_path=template_image, device=device)
+    feats0, image1_T  = extractor_wrapper(image_path=template_image)
     # image1_T = load_image(image1)
 
     img_norm = image1_T / 255.0 if image1_T.max() > 1 else image1_T
@@ -311,9 +312,7 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
 
         # feats0 = extractor.extract(image0_T.to(device))
 
-        # TODO build a matcher cache which handles I_A, I_B and the other way around I_B, I_A
         matches01 = matcher_wrapper(feats0=feats0, feats1=feats1)
-        # matches01 = matcher({"image0": feats0, "image1": feats1})
 
         feats0, feats1, matches01 = [
             rbd(x) for x in [feats0, feats1, matches01]

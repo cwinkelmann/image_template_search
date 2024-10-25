@@ -46,7 +46,7 @@ for i, source_image in enumerate(hA.images):
 
 df_hA = get_flat_df(hA)
 
-logger.info(f"There are {df_hA['ID'].nunique()} objects with the IDs {df_hA['ID'].unique()} in the ground truth")
+logger.info(f"There are {df_hA['ID'].nunique()} objects with the IDs {sorted(df_hA['ID'].unique())} in the ground truth")
 
 
 for a in anno:
@@ -59,7 +59,7 @@ for a in anno:
         mean_igunas = mean(numbers)
         # print(f"Mean iguanas: {mean_igunas}")
         print(f"{hA.images[0].image_name} has {len(hA.images[0].labels)} iguanas")
-        print(f"IDs iguanas: {df_hA_single['ID'].unique()}")
+        print(f"IDs iguanas: {sorted(df_hA_single['ID'].unique())}")
 
 
 

@@ -152,8 +152,8 @@ def get_similarity_cache_to_disk():
             # Create a unique cache file name based on the inputs (hash the paths)
             cache_key = hashlib.md5(f"{image0}{image1}".encode()).hexdigest()
             cache_key_ = hashlib.md5(f"{image1}{image0}".encode()).hexdigest()
-            cache_file = os.path.join(cache_dir, f"{cache_key}_{image0.name}_{image1.name}_find_similarity.pkl")
-            cache_file_ = os.path.join(cache_dir, f"{cache_key_}_{image1.name}_{image0.name}_find_similarity.pkl")
+            cache_file = os.path.join(cache_dir, f"cache_find_similarity_{image0.name}_{image1.name}_{cache_key}.pkl")
+            cache_file_ = os.path.join(cache_dir, f"cache_find_similarity_{image1.name}_{image0.name}_{cache_key_}.pkl")
 
             # Check if cache exists
             if os.path.exists(cache_file):
@@ -304,7 +304,7 @@ def calculate_nearest_border_distance(centroids: list[shapely.Point], frame_widt
         nearest_distance = min(distance_left, distance_right, distance_top, distance_bottom)
 
         distances.append(nearest_distance)
-        logger.info(f"  Nearest Distance to Border: {nearest_distance}\n")
+        # logger.info(f"  Nearest Distance to Border: {nearest_distance}")
     return distances
 
 
