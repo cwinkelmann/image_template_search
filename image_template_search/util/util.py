@@ -193,9 +193,12 @@ def get_image_id(filename: Path = None, image: np.ndarray = None):
         return readable_hash
 
 
-def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapely.Point] = (),
+def visualise_polygons(polygons: List[shapely.Polygon] = (),
+                       points: List[shapely.Point] = (),
                        filename=None, show=False, title = None,
-                       max_x=None, max_y=None, color="blue", ax:axes.Axes =None, linewidth=0.5, markersize=0.5) -> axes.Axes:
+                       max_x=None, max_y=None, color="blue",
+                       ax:axes.Axes =None, linewidth=0.5, markersize=0.5, fontsize=22,
+                       labels: List[str] = None) -> axes.Axes:
     """
     Visualize a list of polygons
     :param polygons:
@@ -211,9 +214,16 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapel
         plt.ylim(0, max_y)
     if title:
         plt.title(title)
-    for polygon in polygons:
+    for i, polygon in enumerate(polygons):
         x, y = polygon.exterior.xy
         ax.plot(x, y, color=color, linewidth=linewidth)
+
+        # Add label for each polygon if labels are provided
+        if labels and i < len(labels):
+            # Get the centroid of the polygon for labeling
+            centroid = polygon.centroid
+            ax.text(centroid.x, centroid.y, labels[i], fontsize=fontsize, ha='center', color='red')
+
     for point in points:
         x, y = point.xy
         ax.plot(x, y, marker='o', color=color, linewidth=linewidth, markersize=markersize)
@@ -221,6 +231,7 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (), points: List[shapel
         plt.savefig(filename)
     if show:
         plt.show()
+        plt.close()
 
     return ax
 
@@ -309,7 +320,7 @@ def calculate_nearest_border_distance(centroids: list[shapely.Point], frame_widt
 
 
 
-def crop_objects_from_image(image: typing.Union[PILImage, np.ndarray], bbox_polygons: List[Polygon]) -> List[PILImage]:
+def crop_templates_from_image(image: typing.Union[PILImage, np.ndarray], bbox_polygons: List[Polygon]) -> List[PILImage]:
     """
     Crop the rectangular polygons from the image and return them as a list of cropped images.
 

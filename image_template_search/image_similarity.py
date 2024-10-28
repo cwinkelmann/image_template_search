@@ -305,7 +305,7 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
 
 
           # load the extractor
-        matcher = LightGlue(features="sift").eval().to(device)
+        # matcher = LightGlue(features="sift").eval().to(device)
 
         # TODO prevent this to happen again
         # feats1 = extractor.extract(image1_T.to(device))

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import shapely
+from loguru import logger
 from pydantic import BaseModel, Field
 from shapely import Polygon
 from typing import Optional, List, Dict
@@ -325,3 +326,27 @@ def hA_from_file(file_path: Path) -> HastyAnnotationV2:
         data = json.load(f)
         hA = HastyAnnotationV2(**data)
     return hA
+
+
+def label_dist_edge_threshold(patch_size, source_image):
+    """
+    remove labels which are too close to the border. Only in literal edge cases those are not covered anywhereelse
+    :param patch_size:
+    :param source_image:
+    :return:
+
+
+        ## FIXME this is a bigger issue. If A is 100px from the edge, B is 641px from the edge. The Template might cover A,
+        # FIXME Then this should not be removed
+        # +++++++++++++++++++++++++++
+    """
+    n_labels = len(source_image.labels)
+    # bd_th = int((patch_size ** 2 // 2) ** 0.5)  # TODO THIS would be the right way to calculate the distance
+    bd_th = int(patch_size // 2)
+    source_image.labels = [l for l in source_image.labels if l.centroid.within(
+        Polygon([(0 + bd_th, bd_th), (source_image.width - bd_th, bd_th),
+                 (source_image.width - bd_th, source_image.height - bd_th), (bd_th, source_image.height - bd_th)]))]
+    logger.info(
+        f"After edge thresholding with distance {bd_th} in {len(source_image.labels)}, remove {n_labels - len(source_image.labels)} labels")
+
+    return source_image.labels

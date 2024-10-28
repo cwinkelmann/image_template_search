@@ -21,9 +21,9 @@ from omegaconf import DictConfig
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box, project_annotations_to_crop
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel, label_dist_edge_threshold
 from image_template_search.util.util import visualise_polygons, visualise_image, \
-    crop_objects_from_image, create_box_around_point, calculate_nearest_border_distance
+    crop_templates_from_image, create_box_around_point, calculate_nearest_border_distance
 
 # disable info loggin messages
 # Remove the default logger configuration
@@ -33,10 +33,12 @@ from image_template_search.util.util import visualise_polygons, visualise_image,
 # logger.add(sys.stderr, level="WARNING")
 
 
-def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon]]:
+def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
     """
     Find objects in the image and return them as a list of lists of ImageLabels and a list of polygons
 
+
+    # TODO describe the function properly
     :param image:
     :param patch_size:
     :return:
@@ -46,32 +48,34 @@ def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]],
     template_annotations = []
     template_extents = []
 
-    sorted_by_distance = image.labels
-    ## TODO sort by distance to the center of the image,
+    image.labels.sort(key=lambda label: label.attributes.get("distance_to_nearest_edge", float('inf')), reverse=True)
+
     ## TODO polygons until all covered.
 
     for l in image.labels:
-        # FIXME: an object can be covered by multiple patches. It is returned multiple times. This has to be handled somewhere
-        # if True or ( "ID" in l.attributes and l.attributes["ID"] == "2" ): # TODO remove this I just want to test it with ID 12
         if l not in covered_objects:
-            # TODO calculate the distance to the center of the image
+            if l.attributes.get("distance_to_nearest_edge", float("inf")) > patch_size / 2:
+                # the current object is covered
+                every_other_label = [il for il in image.labels if il not in covered_objects]
+                pc = l.bbox_polygon.centroid
 
-            # the current object is covered
+                buffer = create_box_around_point(pc, a=patch_size, b=patch_size)
 
-            every_other_label = [il for il in image.labels if il not in covered_objects]
-            pc = l.bbox_polygon.centroid
+                covered_objects.extend([l for l in image.labels if buffer.contains(l.centroid)])
 
-            # TODO
-            buffer = create_box_around_point(pc, a=patch_size, b=patch_size)
+                cropped_annotations, buffer = project_annotations_to_crop(buffer=buffer,
+                                                                          imagelabels=every_other_label)
+                template_annotations.append(cropped_annotations)
+                template_extents.append(buffer)
 
-            covered_objects.extend([l for l in image.labels if buffer.contains(l.centroid)])
+            else:
+                logger.warning(f"Label {l.attributes.get('ID')} is too close to the edge, skipping")
 
-            cropped_annotations, buffer = project_annotations_to_crop(buffer=buffer,
-                                                                      imagelabels=every_other_label)
-            template_annotations.append(cropped_annotations)
-            template_extents.append(buffer)
+    covered_ids = {label.id for label in covered_objects}
+    uncovered_labels = [label for label in image.labels if label.id not in covered_ids]
+    covered_labels = [label for label in image.labels if label.id in covered_ids]
 
-    return template_annotations, template_extents
+    return template_annotations, template_extents, covered_labels, uncovered_labels
 
 
 def cutout_detection_deduplication(source_image_path: Path,
@@ -133,15 +137,17 @@ def cutout_detection_deduplication(source_image_path: Path,
                 # project B annotations to template
                 large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
 
-                if CacheConfig.visualise:
+                if CacheConfig.visualise_info:
                     ax_i = visualise_image(image=ipf.warped_image_B, show=False, title=f"Warped with annotations {large_image.image_name}",
                                            dpi=75)
                     ax_i = visualise_polygons([ipf.template_polygon], color="white",
                                               ax=ax_i, linewidth=2.5)
-                    ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red", show=True,
+                    ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red",
+                                              show=False,
                                               ax=ax_i,
                                               linewidth=2.5,
                                               filename=output_path / f"annotations_large_{large_image.image_name}_{template_image_path.stem}.jpg")
+                    plt.close(ax_i.figure)
 
                 ipf_t = ImagePatchFinder(template_path=template_image_path,
                                          template_polygon=cutout_polygon,
@@ -171,7 +177,7 @@ def cutout_detection_deduplication(source_image_path: Path,
                         [l for l in large_image_proj_labels if frame_polygon.contains(l.centroid)]
 
 
-                    if CacheConfig.visualise:
+                    if CacheConfig.visualise_info:
 
                         ax_c = visualise_image(image_path=warped_path,
                                                show=False,
@@ -179,9 +185,11 @@ def cutout_detection_deduplication(source_image_path: Path,
                                                dpi=75)
 
                         ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
-                                                  color="red", show=True, ax=ax_c,
+                                                  color="red", show=False, ax=ax_c,
                                                   linewidth=4.5,
                                                   filename=output_path / f"cropped_{large_image.image_name}_{template_image_path.stem}_{len(large_image_labels_containing)}_objects.jpg")
+
+                        plt.close(ax_c.figure)
 
                     i = Image(image_name=warped_path.name, height=frame_height, width=frame_width,
                               labels=large_image_labels_containing)
@@ -191,7 +199,7 @@ def cutout_detection_deduplication(source_image_path: Path,
 
             else:
                 logger.warning(f"The frame is not within the template polygon")
-
+    ## these are supposed to be the same objects on multiple images
     return covered_objects
 
 
@@ -213,21 +221,50 @@ def find_annotated_template_matches(images_path: Path,
     covered_objects: typing.List[Image] = []
     logger.info(f"Looking for objects in {source_image.image_name}, {[l.attributes['ID'] for l in source_image.labels]}")
 
+    distances = calculate_nearest_border_distance([l.centroid for l in source_image.labels], source_image.width,
+                                             source_image.height)
+
+    # update the labels with distance
+    for label, distance in zip(source_image.labels, distances):
+        label.attributes["distance_to_nearest_edge"] = distance
+
+    # sort the labels by distance to the nearest edge
+
+    logger.info(f"Looking for objects in {len(other_images)} images, with distances: {distances} to edge. ")
+
+    # remove labels which are too close to the border. Only in literal edge cases those are not covered anywhereelse
+    # For ID 9 in DJI_0054.JPG this is the case.
+    # TODO use the patch size to calculate the buffer
+    # TODO log if labels are removed
+    # TODO this is bigger then the patch size on purpose, How big should it be?
+    # source_image.labels = label_dist_edge_threshold(patch_size, source_image=source_image)
+
+    objs_in_template, template_extents, covered_labels, uncovered_labels = find_objects(source_image, patch_size=patch_size)
+
+    # TODO remove labels that are not in the templates
+
     p_image = PILImage.open(
         images_path / source_image.dataset_name / source_image.image_name)  # Replace with your image file path
 
-    objs_in_template, template_extents = find_objects(source_image, patch_size=patch_size)
-
-    templates = crop_objects_from_image(image=p_image,
-                                        bbox_polygons=template_extents)
+    templates = crop_templates_from_image(image=p_image,
+                                          bbox_polygons=template_extents)
 
 
-
-    for i, t in enumerate(templates):
+    # TODO visualse that edge threshold
+    if CacheConfig.visualise:
         # visualise_polygons([t], color="green", show=True)
-        ax = visualise_image(image=t, show=False, title=f"New Objects_{source_image.image_name} template:{i}")
-        ax = visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], ax=ax, color="blue", show=True)
-        pass
+        ax = visualise_image(image=p_image, show=False, title=f"Template Extents and missing Objects, {source_image.image_name}")
+        ax = visualise_polygons([x for x in template_extents],
+                                ax=ax, color="white", show=False)
+        ax = visualise_polygons([x.bbox_polygon for x in covered_labels],
+                                labels=[x.attributes["ID"] for x in covered_labels],
+                                ax=ax, color="green", linewidth=4.5, show=False)
+        ax = visualise_polygons([x.bbox_polygon for x in uncovered_labels],
+                                labels=[x.attributes["ID"] for x in uncovered_labels],
+                                ax=ax, color="blue", linewidth=4.5, show=True,
+                                filename=output_path / f"template_extents_{source_image.image_name}.jpg")
+
+        plt.close(ax.figure)
 
     for i, t in enumerate(templates):
 
@@ -238,12 +275,15 @@ def find_annotated_template_matches(images_path: Path,
         template_image_ann = Image(image_name=template_image_path.name,
                                    height=t.height, width=t.width,
                                    labels=objs_in_template[i])
-        if CacheConfig.visualise:
+        if CacheConfig.visualise_info:
             ax_q = visualise_image(image=t, show=False,
                                    title=f"New Objects_{source_image.image_name} template:{i} with annotations:{len(objs_in_template[i])}")
             visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
+                               labels=[x.attributes["ID"] for x in objs_in_template[i]],
                                filename=output_path / f"template_ann_{source_image.image_name}_{i}.jpg",
-                               show=True, ax=ax_q, linewidth=4.5)
+                               show=False, ax=ax_q, linewidth=4.5)
+
+            plt.close(ax_q.figure)
 
         image_stack = cutout_detection_deduplication(
             source_image_path=images_path / source_image.dataset_name / source_image.image_name,
@@ -261,10 +301,12 @@ def find_annotated_template_matches(images_path: Path,
                 "template_id": i,
                 "template_image": template_image_path,
                 "source_image": source_image.image_name,
-                "covered_objects": image_stack
+                "covered_objects": image_stack,
+                "new_objects": objs_in_template[i],
+                "template_extents": template_extents[i],
              }
         )
-        image_stack
+
 
     return covered_objects
 
@@ -284,46 +326,52 @@ def demo_template():
     total_object_count = 0
     total_objects = []
 
-    hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=True)
+    hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG", "DJI_0062.JPG"]]
 
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
     #                                                       #"DJI_0050.JPG",
     #                                                       # "DJI_0052.JPG",
-    #                                                       "DJI_0058.JPG", "DJI_0059.JPG",
+    #                                                       # "DJI_0058.JPG", "DJI_0059.JPG",
     # #                                                      "DJI_0053.JPG", "DJI_0054.JPG", "DJI_0055.JPG",
     #                                                       # "DJI_0056.JPG",
     #                                                       # "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG",
-    #                                                       "DJI_0062.JPG", "DJI_0063.JPG", "DJI_0064.JPG",
+    #                                                       # "DJI_0062.JPG", "DJI_0063.JPG", "DJI_0064.JPG",
+    #                                                          "DJI_0091.JPG",
+    #                                                          "DJI_0094.JPG",
+    #                                                             "DJI_0101.JPG",
     #               ]]
 
-    hA.images = [i for i in hA.images if i.image_name in [
-         "DJI_0049.JPG",
-    #                                                     "DJI_0050.JPG",
-    #                                                       "DJI_0051.JPG",
-    #                                                       "DJI_0052.JPG",
-    #                                                       "DJI_0053.JPG",
-    #                                                       "DJI_0054.JPG",
-    #                                                       "DJI_0055.JPG",
-    #                                                       "DJI_0056.JPG",
-    #                                                       "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
-                                                           "DJI_0060.JPG",
-    #                                                       "DJI_0061.JPG",
-    #                                                       "DJI_0062.JPG",
-    #                                                       "DJI_0063.JPG", # First image with ID 7
-    #                                                       "DJI_0064.JPG",
-    #                                                       "DJI_0065.JPG",
-    #                                                      "DJI_0077.JPG",
-    #                                                   "DJI_0078.JPG",
-    #                                                  "DJI_0079.JPG",
-    # #                                                     "DJI_0079.JPG",
-    #                                                      "DJI_0094.JPG",
-                                                         "DJI_0101.JPG",
-                   ]]
+    # hA.images = [i for i in hA.images if i.image_name in [
+    #                                                  #        "DJI_0049.JPG",
+    #                                                  #     "DJI_0050.JPG",
+    #                                                  #       "DJI_0051.JPG",
+    #                                                  #      "DJI_0052.JPG",
+    #                                                  #      "DJI_0053.JPG",
+    #                                                  #      "DJI_0054.JPG",
+    #                                                  #      "DJI_0055.JPG",
+    #                                                  #      "DJI_0056.JPG",
+    #                                                  #      "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
+    #                                                  #        "DJI_0060.JPG",
+    #                                                  #       "DJI_0061.JPG",
+    #                                                  #      "DJI_0062.JPG",
+    #                                                  #      "DJI_0063.JPG", # First image with ID 7
+    #                                                  #      "DJI_0064.JPG",
+    #                                                  #       "DJI_0065.JPG",
+    #                                                       "DJI_0066.JPG",
+    #                                                       "DJI_0076.JPG",
+    #                                                       "DJI_0077.JPG",
+    #                                                    "DJI_0078.JPG",
+    #                                                  # "DJI_0079.JPG",
+    #                                                  #     "DJI_0079.JPG",
+    #                                                  #     "DJI_0094.JPG",
+    #                                                  #     "DJI_0101.JPG",
+    #                ]]
 
 
-    ## remove images without ID 9
-    # hA.images = [i for i in hA.images if any(l.attributes.get("ID") == "14" for l in i.labels)]
+    ## remove images without ID 12
+    # hA.images = [i for i in hA.images if any(l.attributes.get("ID") == "12" for l in i.labels)]
+    # hA.images = [i for i in hA.images if any(l.attributes.get("ID") == "7" for l in i.labels)]
 
 
 
@@ -342,43 +390,21 @@ def demo_template():
         #source_image = hA.images[0]  # take the first image as the template
         other_images = hA.images[i+1:]  # take the next two images as the other images we are looking for annotations in
 
-        dist = calculate_nearest_border_distance([l.centroid for l in source_image.labels], source_image.width,
-                                          source_image.height)
-        logger.info(f"Looking for objects in {len(other_images)} images, with distances: {dist} to edge. ")
 
-        # remove labels which are too close to the border. Only in literal edge cases those are not covered anywhereelse
-        # For ID 9 in DJI_0054.JPG this is the case.
-        # TODO use the patch size to calculate the buffer
-        # TODO log if labels are removed
-        # TODO this is bigger then the patch size on purpose, How big should it be?
-
-
-        # ++++++++++++++++++++++
-        # bd_th = int( (patch_size**2 // 2) ** 0.5 ) # TODO THIS would be the right way to calculate the distance
-        # bd_th = int(patch_size // 2)
-        #
-        # source_image.labels = [l for l in source_image.labels if l.centroid.within(
-        #     Polygon([(0 + bd_th , bd_th), (source_image.width - bd_th, bd_th),
-        #              (source_image.width - bd_th, source_image.height - bd_th), (bd_th, source_image.height - bd_th)]))]
-
-        ## FIXME this is a bigger issue. If A is 100px from the edge, B is 641px from the edge. The Template might cover A,
-        # FIXME Then this should not be removed
-        # +++++++++++++++++++++++++++
-
-        logger.info(f"After edge thresholding in {len(source_image.labels)} potentially new labels remain on {len(other_images)} images")
         # remove already covered labels from source image
         logger.info(f"Removing known labels {known_labels} from source image {source_image.image_name} to avoid duplications.")
         source_image.labels = [l for l in source_image.labels if l.id not in known_labels]
-        total_object_count += len(source_image.labels)
-        total_objects.extend([l.attributes["ID"] for l in source_image.labels])
-        logger.info(f"Total objects in all images: {total_object_count}")
 
+
+        ## Re-Identify the objects form the source image in the other images
         covered_objects = find_annotated_template_matches(
             images_path,
             source_image,
             other_images,
             output_path,
             patch_size=patch_size)
+
+
 
         for i, stack in enumerate(covered_objects):
             hA_template = copy.deepcopy(hA)
@@ -391,10 +417,15 @@ def demo_template():
                 # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images
                 known_labels.extend( [il.id for i in stack["covered_objects"] for il in i.labels] )
 
-                # find all covered label_ids
+                # total_object_count += len(source_image.labels)
+                total_objects.extend([l.attributes["ID"] for l in stack.get("new_objects")])
+                logger.info(f"Total objects in all images: {len(total_objects)}")
 
-        logger.warning(f"Total objects in all images: {total_object_count}")
+
+
+        logger.warning(f"Total objects in all images: {len(total_objects)}")
         logger.warning(f" objects in all images: {sorted(total_objects)}")
+
 
 
 if __name__ == '__main__':
