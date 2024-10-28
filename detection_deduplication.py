@@ -143,7 +143,7 @@ def cutout_detection_deduplication(source_image_path: Path,
                     ax_i = visualise_polygons([ipf.template_polygon], color="white",
                                               ax=ax_i, linewidth=2.5)
                     ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red",
-                                              show=False,
+                                              show=CacheConfig.show_visualisation,
                                               ax=ax_i,
                                               linewidth=2.5,
                                               filename=output_path / f"annotations_large_{large_image.image_name}_{template_image_path.stem}.jpg")
@@ -154,7 +154,8 @@ def cutout_detection_deduplication(source_image_path: Path,
                                          large_image_path=images_path / large_image.dataset_name / large_image.image_name)
 
                 if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:
-                    logger.warning(f"template object is not in the image {large_image.image_name}")
+
+                    logger.warning(f"template objects ( {[l.attributes.get('ID') for l in template_labels]} ) is not in the image {large_image.image_name}, which holds: {[l.attributes.get('ID') for l in large_image_proj_labels]}")
 
                 elif ipf_t.find_patch(similarity_threshold=0.0005): # FIXME this is where an error can come from. If both images
                     # have the same size and 100% overlap they can have a 100% similarity, if one image is smaller than the other it can't...
@@ -185,7 +186,7 @@ def cutout_detection_deduplication(source_image_path: Path,
                                                dpi=75)
 
                         ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
-                                                  color="red", show=False, ax=ax_c,
+                                                  color="red", show=CacheConfig.show_visualisation, ax=ax_c,
                                                   linewidth=4.5,
                                                   filename=output_path / f"cropped_{large_image.image_name}_{template_image_path.stem}_{len(large_image_labels_containing)}_objects.jpg")
 
@@ -252,16 +253,28 @@ def find_annotated_template_matches(images_path: Path,
 
     # TODO visualse that edge threshold
     if CacheConfig.visualise:
+        bd_th = int(patch_size // 2)
+
+        center_polygon = Polygon([(0 + bd_th, bd_th), (source_image.width - bd_th, bd_th),
+                                  (source_image.width - bd_th, source_image.height - bd_th),
+                                  (bd_th, source_image.height - bd_th)])
+
         # visualise_polygons([t], color="green", show=True)
         ax = visualise_image(image=p_image, show=False, title=f"Template Extents and missing Objects, {source_image.image_name}")
+        ax = visualise_polygons([center_polygon],
+                                ax=ax, color="white")
         ax = visualise_polygons([x for x in template_extents],
-                                ax=ax, color="white", show=False)
+                                ax=ax, color="white")
+        # known_labels = [l for l in source_image.labels if l.id in known_labels]
+        # ax = visualise_polygons([x.bbox_polygon for x in covered_labels],
+        #                         labels=[x.attributes["ID"] for x in covered_labels],
+        #                         ax=ax, color="yellow", linewidth=4.5, show=False)
         ax = visualise_polygons([x.bbox_polygon for x in covered_labels],
                                 labels=[x.attributes["ID"] for x in covered_labels],
-                                ax=ax, color="green", linewidth=4.5, show=False)
+                                ax=ax, color="blue", linewidth=4.5)
         ax = visualise_polygons([x.bbox_polygon for x in uncovered_labels],
                                 labels=[x.attributes["ID"] for x in uncovered_labels],
-                                ax=ax, color="blue", linewidth=4.5, show=True,
+                                ax=ax, color="green", linewidth=4.5, show=CacheConfig.show_visualisation,
                                 filename=output_path / f"template_extents_{source_image.image_name}.jpg")
 
         plt.close(ax.figure)
@@ -281,7 +294,7 @@ def find_annotated_template_matches(images_path: Path,
             visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
                                labels=[x.attributes["ID"] for x in objs_in_template[i]],
                                filename=output_path / f"template_ann_{source_image.image_name}_{i}.jpg",
-                               show=False, ax=ax_q, linewidth=4.5)
+                               show=CacheConfig.show_visualisation, ax=ax_q, linewidth=4.5)
 
             plt.close(ax_q.figure)
 
@@ -317,7 +330,7 @@ def demo_template():
     :return:
     """
     hA = hA_from_file(
-        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_24.json"))
+        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_28.json"))
     images_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
     output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
 
@@ -342,31 +355,47 @@ def demo_template():
     #                                                             "DJI_0101.JPG",
     #               ]]
 
-    # hA.images = [i for i in hA.images if i.image_name in [
-    #                                                  #        "DJI_0049.JPG",
-    #                                                  #     "DJI_0050.JPG",
-    #                                                  #       "DJI_0051.JPG",
-    #                                                  #      "DJI_0052.JPG",
-    #                                                  #      "DJI_0053.JPG",
-    #                                                  #      "DJI_0054.JPG",
-    #                                                  #      "DJI_0055.JPG",
-    #                                                  #      "DJI_0056.JPG",
-    #                                                  #      "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
-    #                                                  #        "DJI_0060.JPG",
-    #                                                  #       "DJI_0061.JPG",
-    #                                                  #      "DJI_0062.JPG",
-    #                                                  #      "DJI_0063.JPG", # First image with ID 7
-    #                                                  #      "DJI_0064.JPG",
-    #                                                  #       "DJI_0065.JPG",
-    #                                                       "DJI_0066.JPG",
-    #                                                       "DJI_0076.JPG",
-    #                                                       "DJI_0077.JPG",
-    #                                                    "DJI_0078.JPG",
-    #                                                  # "DJI_0079.JPG",
-    #                                                  #     "DJI_0079.JPG",
-    #                                                  #     "DJI_0094.JPG",
-    #                                                  #     "DJI_0101.JPG",
-    #                ]]
+    hA.images = [i for i in hA.images if i.image_name in [
+        "DJI_0049.JPG",
+        "DJI_0050.JPG",
+        "DJI_0051.JPG",
+        "DJI_0052.JPG",
+        "DJI_0053.JPG",
+        "DJI_0054.JPG",
+        "DJI_0055.JPG",
+        "DJI_0056.JPG",
+        "DJI_0057.JPG",
+        "DJI_0058.JPG",
+        "DJI_0059.JPG",
+        "DJI_0060.JPG",
+        "DJI_0061.JPG",
+        "DJI_0062.JPG",
+        "DJI_0063.JPG",  # First image with ID 7
+        "DJI_0064.JPG",
+        "DJI_0065.JPG",
+        "DJI_0066.JPG",
+        "DJI_0067.JPG",
+        "DJI_0068.JPG",
+        "DJI_0069.JPG",
+        "DJI_0070.JPG",
+        "DJI_0071.JPG",  # problematic image
+        "DJI_0072.JPG",
+        "DJI_0073.JPG",
+        "DJI_0074.JPG",
+        "DJI_0075.JPG",
+        "DJI_0076.JPG",
+        "DJI_0077.JPG",
+        "DJI_0078.JPG",
+        "DJI_0079.JPG",
+        "DJI_0082.JPG",
+        "DJI_0085.JPG",
+        "DJI_0088.JPG",
+        "DJI_0091.JPG",  # with 71 a probelmatic image
+        "DJI_0094.JPG",
+        "DJI_0097.JPG",
+        "DJI_0100.JPG",
+        "DJI_0101.JPG",
+    ]]
 
 
     ## remove images without ID 12
@@ -389,7 +418,7 @@ def demo_template():
 
         #source_image = hA.images[0]  # take the first image as the template
         other_images = hA.images[i+1:]  # take the next two images as the other images we are looking for annotations in
-
+        # TODO set select nearby images only
 
         # remove already covered labels from source image
         logger.info(f"Removing known labels {known_labels} from source image {source_image.image_name} to avoid duplications.")

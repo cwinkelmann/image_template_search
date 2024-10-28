@@ -289,7 +289,7 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
 
     # image0_T = load_image(template_image)
     logger.info(f"START extracting features from {image1.name}")
-    feats1, _ = extractor_wrapper(image_path=image1)
+    feats1, _ = extractor_wrapper(image_path=image1, max_num_keypoints=10000)
     logger.info(f"DONE extracting features from {image1.name}")
 
     feats0, image1_T  = extractor_wrapper(image_path=template_image)
@@ -344,8 +344,9 @@ def find_rotation_gen(m_kpts0: np.ndarray,
     """
     if isinstance(image_name, str):
         image_name = Path(image_name)
-
-    M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, 5.0)
+    ransac_reproj_threshold = 5.0
+    logger.info(f"RANSAC Threshold: {ransac_reproj_threshold}")
+    M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, ransac_reproj_threshold)
     img1 = cv2.imread(str(image_name), cv2.IMREAD_GRAYSCALE)
     h, w = img1.shape
     pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
