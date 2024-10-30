@@ -1,0 +1,179 @@
+{
+  "project_name": "tracking",
+  "create_date": "2023-08-23T10:39:54Z",
+  "export_format_version": "1.1",
+  "export_date": "2024-10-28T17:06:49Z",
+  "label_classes": [
+    {
+      "class_id": "bced64e9-496b-4bd0-bce5-d7c084d7da53",
+      "parent_class_id": null,
+      "class_name": "iguana",
+      "class_type": "object",
+      "color": "#aa5ea4a6",
+      "norder": 10.0,
+      "icon_url": null,
+      "attributes": [
+        "ID"
+      ]
+    },
+    {
+      "class_id": "d006804d-0434-40ee-a87d-f1dbe621bea9",
+      "parent_class_id": null,
+      "class_name": "seal",
+      "class_type": "object",
+      "color": "#1f78b44d",
+      "norder": 11.0,
+      "icon_url": null,
+      "attributes": [
+        "ID"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "image_id": "74ff9e65-67af-48c8-8ce8-096f429a3114",
+      "image_name": "DJI_0049.JPG",
+      "dataset_name": "single_images",
+      "ds_image_name": null,
+      "width": 5472,
+      "height": 3648,
+      "image_status": "DONE",
+      "tags": [],
+      "labels": [
+        {
+          "id": "4d31e5ce-8f68-4fa8-b05a-d3a1a5b22ed0",
+          "class_name": "iguana",
+          "bbox": [
+            3148,
+            788,
+            3215,
+            906
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 0,
+          "attributes": {
+            "ID": "8"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "d9673802-1490-49a3-b5d0-e4eda74db14e",
+          "class_name": "iguana",
+          "bbox": [
+            3975,
+            714,
+            4048,
+            828
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 1,
+          "attributes": {
+            "ID": "9"
+          },
+          "keypoints": []
+        }
+      ],
+      "image_mode": "YCbCr"
+    },
+    {
+      "image_id": "c3978d93-68aa-4a0f-a1cf-c18587a7b0f9",
+      "image_name": "DJI_0063.JPG",
+      "dataset_name": "single_images",
+      "ds_image_name": null,
+      "width": 5472,
+      "height": 3648,
+      "image_status": "DONE",
+      "tags": [],
+      "labels": [
+        {
+          "id": "1f77baaa-dea8-4192-b46f-e4bcf9d6744b",
+          "class_name": "iguana",
+          "bbox": [
+            1942,
+            796,
+            1998,
+            941
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 2,
+          "attributes": {
+            "ID": "7"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "32f9fdb8-72c7-4a86-b5b6-c2183734639b",
+          "class_name": "iguana",
+          "bbox": [
+            1143,
+            150,
+            1198,
+            327
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 4,
+          "attributes": {
+            "ID": "1"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "542c0d14-8296-4b64-aeff-5f53cb05886c",
+          "class_name": "iguana",
+          "bbox": [
+            2600,
+            2444,
+            2683,
+            2539
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 0,
+          "attributes": {
+            "ID": "8"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "92fdbb29-1776-4fe8-aeb2-055c0258eacc",
+          "class_name": "iguana",
+          "bbox": [
+            3440,
+            2233,
+            3516,
+            2337
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 1,
+          "attributes": {
+            "ID": "9"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "b66c1c1b-7e04-4e34-bcc2-a42ed4aa5d6d",
+          "class_name": "iguana",
+          "bbox": [
+            3049,
+            216,
+            3116,
+            274
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 3,
+          "attributes": {
+            "ID": "11"
+          },
+          "keypoints": []
+        }
+      ],
+      "image_mode": "YCbCr"
+    }
+  ]
+}

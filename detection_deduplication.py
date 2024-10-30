@@ -5,6 +5,7 @@
 import copy
 import gc
 import json
+import random
 import sys
 import typing
 from pathlib import Path
@@ -15,6 +16,8 @@ from loguru import logger
 from matplotlib import pyplot as plt
 from shapely import Polygon
 from shapely.affinity import affine_transform
+
+import hashlib
 
 import hydra
 from omegaconf import DictConfig
@@ -208,7 +211,7 @@ def find_annotated_template_matches(images_path: Path,
                                     source_image: Image,
                                     other_images: list[Image],
                                     output_path: Path,
-                                    patch_size = 1280) -> list[Image]:
+                                    patch_size = 1280) -> list[dict]:
     """
     project every object on other images to the template image
 
@@ -233,16 +236,7 @@ def find_annotated_template_matches(images_path: Path,
 
     logger.info(f"Looking for objects in {len(other_images)} images, with distances: {distances} to edge. ")
 
-    # remove labels which are too close to the border. Only in literal edge cases those are not covered anywhereelse
-    # For ID 9 in DJI_0054.JPG this is the case.
-    # TODO use the patch size to calculate the buffer
-    # TODO log if labels are removed
-    # TODO this is bigger then the patch size on purpose, How big should it be?
-    # source_image.labels = label_dist_edge_threshold(patch_size, source_image=source_image)
-
     objs_in_template, template_extents, covered_labels, uncovered_labels = find_objects(source_image, patch_size=patch_size)
-
-    # TODO remove labels that are not in the templates
 
     p_image = PILImage.open(
         images_path / source_image.dataset_name / source_image.image_name)  # Replace with your image file path
@@ -250,8 +244,6 @@ def find_annotated_template_matches(images_path: Path,
     templates = crop_templates_from_image(image=p_image,
                                           bbox_polygons=template_extents)
 
-
-    # TODO visualse that edge threshold
     if CacheConfig.visualise:
         bd_th = int(patch_size // 2)
 
@@ -281,8 +273,17 @@ def find_annotated_template_matches(images_path: Path,
 
     for i, t in enumerate(templates):
 
+
+        # make the template unique
+        hashes = {o.id for o in objs_in_template[i]}
+        hashes = "_".join(hashes)
+
+        hash_object = hashlib.sha256(hashes.encode())
+        # Return a truncated version of the hash (e.g., first 10 characters)
+        combined_hash = hash_object.hexdigest()
         # Save the templates
-        template_image_path = output_path / f"template_source_{source_image.image_name}_{i}_{patch_size}.jpg"
+        template_id = f"{source_image.image_name}_{combined_hash}_{patch_size}"
+        template_image_path = output_path / f"template_source_{template_id}.jpg"
         t.save(template_image_path)  # a bit
 
         template_image_ann = Image(image_name=template_image_path.name,
@@ -311,9 +312,11 @@ def find_annotated_template_matches(images_path: Path,
 
         covered_objects.append(
             {
-                "template_id": i,
+                "template_id": template_id,
                 "template_image": template_image_path,
-                "source_image": source_image.image_name,
+                "source_image_name": source_image.image_name,
+                "source_image": source_image,
+                "other_images": other_images,
                 "covered_objects": image_stack,
                 "new_objects": objs_in_template[i],
                 "template_extents": template_extents[i],
@@ -339,7 +342,11 @@ def demo_template():
     total_object_count = 0
     total_objects = []
 
-    hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
+    # hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
+
+    # True random order
+    random.shuffle(hA.images)
+
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG", "DJI_0062.JPG"]]
 
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
@@ -357,44 +364,44 @@ def demo_template():
 
     hA.images = [i for i in hA.images if i.image_name in [
         "DJI_0049.JPG",
-        "DJI_0050.JPG",
-        "DJI_0051.JPG",
-        "DJI_0052.JPG",
-        "DJI_0053.JPG",
-        "DJI_0054.JPG",
-        "DJI_0055.JPG",
-        "DJI_0056.JPG",
-        "DJI_0057.JPG",
-        "DJI_0058.JPG",
-        "DJI_0059.JPG",
-        "DJI_0060.JPG",
-        "DJI_0061.JPG",
-        "DJI_0062.JPG",
+        # "DJI_0050.JPG",
+        # "DJI_0051.JPG",
+        # "DJI_0052.JPG",
+        # "DJI_0053.JPG",
+        # "DJI_0054.JPG",
+        # "DJI_0055.JPG",
+        # "DJI_0056.JPG",
+        # "DJI_0057.JPG",
+        # "DJI_0058.JPG",
+        # "DJI_0059.JPG",
+        # "DJI_0060.JPG",
+        # "DJI_0061.JPG",
+        # "DJI_0062.JPG",
         "DJI_0063.JPG",  # First image with ID 7
-        "DJI_0064.JPG",
-        "DJI_0065.JPG",
-        "DJI_0066.JPG",
-        "DJI_0067.JPG",
-        "DJI_0068.JPG",
-        "DJI_0069.JPG",
-        "DJI_0070.JPG",
-        "DJI_0071.JPG",  # problematic image
-        "DJI_0072.JPG",
-        "DJI_0073.JPG",
-        "DJI_0074.JPG",
-        "DJI_0075.JPG",
-        "DJI_0076.JPG",
-        "DJI_0077.JPG",
-        "DJI_0078.JPG",
-        "DJI_0079.JPG",
-        "DJI_0082.JPG",
-        "DJI_0085.JPG",
-        "DJI_0088.JPG",
-        "DJI_0091.JPG",  # with 71 a probelmatic image
-        "DJI_0094.JPG",
-        "DJI_0097.JPG",
-        "DJI_0100.JPG",
-        "DJI_0101.JPG",
+        # "DJI_0064.JPG",
+        # "DJI_0065.JPG",
+        # "DJI_0066.JPG",
+        # "DJI_0067.JPG",
+        # "DJI_0068.JPG",
+        # "DJI_0069.JPG",
+        # "DJI_0070.JPG",
+        # "DJI_0071.JPG",  # problematic image
+        # "DJI_0072.JPG",
+        # "DJI_0073.JPG",
+        # "DJI_0074.JPG",
+        # "DJI_0075.JPG",
+        # "DJI_0076.JPG",
+        # "DJI_0077.JPG",
+        # "DJI_0078.JPG",
+        # "DJI_0079.JPG",
+        # "DJI_0082.JPG",
+        # "DJI_0085.JPG",
+        # "DJI_0088.JPG",
+        # "DJI_0091.JPG",  # with 71 a probelmatic image
+        # "DJI_0094.JPG",
+        # "DJI_0097.JPG",
+        # "DJI_0100.JPG",
+        # "DJI_0101.JPG",
     ]]
 
 
@@ -406,7 +413,7 @@ def demo_template():
 
     # ## remove all IDs but X
     # for image in hA.images:
-    #     image.labels = [l for l in image.labels if l.attributes.get("ID") == "8"]
+    #     image.labels = [l for l in image.labels if l.attributes.get("ID") == "12"]
 
     # TODO get only the nearest images to the template image
 
@@ -419,6 +426,9 @@ def demo_template():
         #source_image = hA.images[0]  # take the first image as the template
         other_images = hA.images[i+1:]  # take the next two images as the other images we are looking for annotations in
         # TODO set select nearby images only
+
+        # TODO save the other images and the source images hA annotations
+        hA.save(output_path / f"test_annotations_{source_image.image_name}.json")
 
         # remove already covered labels from source image
         logger.info(f"Removing known labels {known_labels} from source image {source_image.image_name} to avoid duplications.")

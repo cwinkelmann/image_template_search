@@ -97,6 +97,9 @@ class ImageLabel(BaseModel):
         self._bbox_polygon = value
         self.bbox = [int(value.bounds[0]), int(value.bounds[1]), int(value.bounds[2]), int(value.bounds[3])]
 
+    def __hash__(self):
+        return self.id
+
 class Image(BaseModel):
     image_id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='image_id')
     image_name: str = Field(alias='image_name', description="Name of the image file")
@@ -118,6 +121,11 @@ class HastyAnnotationV2(BaseModel):
     export_date: datetime = Field(default=datetime.now())
     label_classes: List[LabelClass]
     images: List[Image]
+
+    def save(self, file_path: Path):
+        with open(file_path, 'w') as json_file:
+            # Serialize the list of Pydantic objects to a list of dictionaries
+            json_file.write(self.model_dump_json())
 
 
 class HastyAnnotationV2_flat(BaseModel):
@@ -328,17 +336,13 @@ def hA_from_file(file_path: Path) -> HastyAnnotationV2:
     return hA
 
 
+
 def label_dist_edge_threshold(patch_size, source_image):
     """
     remove labels which are too close to the border. Only in literal edge cases those are not covered anywhereelse
     :param patch_size:
     :param source_image:
     :return:
-
-
-        ## FIXME this is a bigger issue. If A is 100px from the edge, B is 641px from the edge. The Template might cover A,
-        # FIXME Then this should not be removed
-        # +++++++++++++++++++++++++++
     """
     n_labels = len(source_image.labels)
     # bd_th = int((patch_size ** 2 // 2) ** 0.5)  # TODO THIS would be the right way to calculate the distance

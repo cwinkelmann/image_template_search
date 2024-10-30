@@ -781,7 +781,6 @@ class ImagePatchFinder(object):
         """
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path,
                                                           Path(self.large_image_path))
-        # normalised_sim, m_kpts0, m_kpts1 = get_similarity_tiled(self.template_path, Path(self.large_image_path))
 
         if normalised_sim < similarity_threshold:
             logger.warning("The template is not in the image")
