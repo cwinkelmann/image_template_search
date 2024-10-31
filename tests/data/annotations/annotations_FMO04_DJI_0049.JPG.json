@@ -78,6 +78,53 @@
       "image_mode": "YCbCr"
     },
     {
+      "image_id": "5d6c9433-c26c-4253-99d1-8319e74f90e2",
+      "image_name": "DJI_0052.JPG",
+      "dataset_name": "single_images",
+      "ds_image_name": null,
+      "width": 5472,
+      "height": 3648,
+      "image_status": "DONE",
+      "tags": [],
+      "labels": [
+        {
+          "id": "51c1c889-e0d3-4964-81c9-08c4b26521e3",
+          "class_name": "iguana",
+          "bbox": [
+            3261,
+            1412,
+            3345,
+            1524
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 0,
+          "attributes": {
+            "ID": "8"
+          },
+          "keypoints": []
+        },
+        {
+          "id": "aed7fc6e-33d1-4470-8681-1d50b442bee1",
+          "class_name": "iguana",
+          "bbox": [
+            4096,
+            1296,
+            4174,
+            1411
+          ],
+          "polygon": null,
+          "mask": null,
+          "z_index": 1,
+          "attributes": {
+            "ID": "9"
+          },
+          "keypoints": []
+        }
+      ],
+      "image_mode": "YCbCr"
+    },
+    {
       "image_id": "c3978d93-68aa-4a0f-a1cf-c18587a7b0f9",
       "image_name": "DJI_0063.JPG",
       "dataset_name": "single_images",

@@ -39,6 +39,7 @@ from pathlib import Path
 from joblib import Memory
 
 from conf.config_dataclass import CacheConfig
+from image_template_search.util.HastyAnnotationV2 import ImageLabel
 
 
 def feature_extractor_cache():
@@ -191,6 +192,22 @@ def get_image_id(filename: Path = None, image: np.ndarray = None):
         image_bytes = image.tobytes()
         readable_hash = hashlib.sha256(image_bytes).hexdigest()
         return readable_hash
+
+
+def get_template_id(image_name, combined_hash, patch_size):
+    return f"{image_name}__{combined_hash}__{patch_size}"
+
+
+def hash_objects(objs: list[ImageLabel]) -> str:
+    # make the template unique
+    hashes = {o.id for o in objs}
+    hashes = "_".join(hashes)
+
+    hash_object = hashlib.sha256(hashes.encode())
+    # Return a truncated version of the hash (e.g., first 10 characters)
+    combined_hash = hash_object.hexdigest()
+
+    return combined_hash
 
 
 def visualise_polygons(polygons: List[shapely.Polygon] = (),

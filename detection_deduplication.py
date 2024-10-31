@@ -24,17 +24,34 @@ from omegaconf import DictConfig
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box, project_annotations_to_crop
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel, label_dist_edge_threshold
+from image_template_search.util.CoveredObjectType import CoveredObject
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel, label_dist_edge_threshold, \
+    HastyAnnotationV2, LabelClass
 from image_template_search.util.util import visualise_polygons, visualise_image, \
-    crop_templates_from_image, create_box_around_point, calculate_nearest_border_distance
+    crop_templates_from_image, create_box_around_point, calculate_nearest_border_distance, get_template_id, hash_objects
 
-# disable info loggin messages
+# TODO Wrap this somewhere, i.e. the Config.
+# disable info logging messages
 # Remove the default logger configuration
 # logger.remove()
 # # Add a new logger, but filter out INFO level
 # logger.add(sink=lambda msg: None, level="INFO")  # This silences INFO level logs
 # logger.add(sys.stderr, level="WARNING")
 
+
+def persist_image_stacks(covered_objects: typing.List[CoveredObject], label_classes: typing.List[LabelClass],
+                         output_path: Path) -> typing.List[HastyAnnotationV2]:
+    stacked_annotations = []
+
+    for i, stack in enumerate(covered_objects):
+        template_id = stack.template_id
+        with open(output_path / f"template_annotations__{template_id}.json", 'w') as json_file:
+            hA = HastyAnnotationV2(label_classes=label_classes, project_name="cutouts", images=stack.covered_templates)
+            json_file.write(hA.model_dump_json())
+
+            stacked_annotations.append(hA)
+
+    return stacked_annotations
 
 def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
     """
@@ -92,6 +109,7 @@ def cutout_detection_deduplication(source_image_path: Path,
     """
     Cutout the detection from the image
 
+    :param template_image_path:
     :param output_path:
     :param images_path:
     :param other_images:
@@ -114,8 +132,6 @@ def cutout_detection_deduplication(source_image_path: Path,
         ipf = ImagePatchFinder(template_path=source_image_path,
                                template_polygon=cutout_polygon,
                                large_image_path=images_path / large_image.dataset_name / large_image.image_name)
-
-
 
 
         # Match and find homography for both full size images
@@ -195,7 +211,8 @@ def cutout_detection_deduplication(source_image_path: Path,
 
                         plt.close(ax_c.figure)
 
-                    i = Image(image_name=warped_path.name, height=frame_height, width=frame_width,
+                    i = Image(image_name=warped_path.name,
+                              height=frame_height, width=frame_width,
                               labels=large_image_labels_containing)
 
                     covered_objects.append(i)
@@ -203,7 +220,9 @@ def cutout_detection_deduplication(source_image_path: Path,
 
             else:
                 logger.warning(f"The frame is not within the template polygon")
+
     ## these are supposed to be the same objects on multiple images
+
     return covered_objects
 
 
@@ -211,10 +230,11 @@ def find_annotated_template_matches(images_path: Path,
                                     source_image: Image,
                                     other_images: list[Image],
                                     output_path: Path,
-                                    patch_size = 1280) -> list[dict]:
+                                    patch_size = 1280) -> list[CoveredObject]:
     """
     project every object on other images to the template image
 
+    :param patch_size:
     :param images_path:
     :param source_image:
     :param other_images:
@@ -222,7 +242,7 @@ def find_annotated_template_matches(images_path: Path,
     :return:
     """
     # typing list of Image
-    covered_objects: typing.List[Image] = []
+    covered_objects: typing.List[CoveredObject] = []
     logger.info(f"Looking for objects in {source_image.image_name}, {[l.attributes['ID'] for l in source_image.labels]}")
 
     distances = calculate_nearest_border_distance([l.centroid for l in source_image.labels], source_image.width,
@@ -233,7 +253,6 @@ def find_annotated_template_matches(images_path: Path,
         label.attributes["distance_to_nearest_edge"] = distance
 
     # sort the labels by distance to the nearest edge
-
     logger.info(f"Looking for objects in {len(other_images)} images, with distances: {distances} to edge. ")
 
     objs_in_template, template_extents, covered_labels, uncovered_labels = find_objects(source_image, patch_size=patch_size)
@@ -272,19 +291,17 @@ def find_annotated_template_matches(images_path: Path,
         plt.close(ax.figure)
 
     for i, t in enumerate(templates):
+        # Iterate through the templates and find the objects in the other images
 
 
-        # make the template unique
-        hashes = {o.id for o in objs_in_template[i]}
-        hashes = "_".join(hashes)
 
-        hash_object = hashlib.sha256(hashes.encode())
-        # Return a truncated version of the hash (e.g., first 10 characters)
-        combined_hash = hash_object.hexdigest()
-        # Save the templates
-        template_id = f"{source_image.image_name}_{combined_hash}_{patch_size}"
+        combined_hash = hash_objects(objs=objs_in_template[i])
+        # template_id = f"{source_image.image_name}_{combined_hash}_{patch_size}"
+
+
+        template_id = get_template_id(image_name=source_image.image_name, combined_hash=combined_hash, patch_size=patch_size)
         template_image_path = output_path / f"template_source_{template_id}.jpg"
-        t.save(template_image_path)  # a bit
+        t.save(template_image_path)  # save the template
 
         template_image_ann = Image(image_name=template_image_path.name,
                                    height=t.height, width=t.width,
@@ -299,6 +316,7 @@ def find_annotated_template_matches(images_path: Path,
 
             plt.close(ax_q.figure)
 
+        # putting all matched cutouts in one list
         image_stack = cutout_detection_deduplication(
             source_image_path=images_path / source_image.dataset_name / source_image.image_name,
             template_image_path=template_image_path,
@@ -308,20 +326,23 @@ def find_annotated_template_matches(images_path: Path,
             images_path=images_path,
             output_path=output_path)
 
+        # the template itself
         image_stack.append(template_image_ann)
 
-        covered_objects.append(
-            {
-                "template_id": template_id,
-                "template_image": template_image_path,
-                "source_image_name": source_image.image_name,
-                "source_image": source_image,
-                "other_images": other_images,
-                "covered_objects": image_stack,
-                "new_objects": objs_in_template[i],
-                "template_extents": template_extents[i],
-             }
+
+        covered_object = CoveredObject(
+            template_id=template_id,
+            template_image_path=template_image_path,
+            source_image_name=source_image.image_name,
+            source_image=source_image,
+            other_images=other_images,
+            covered_templates=image_stack,
+            new_objects=objs_in_template[i],
+            template_extents=template_extents[i]
         )
+
+        # Append to covered_objects
+        covered_objects.append(covered_object)
 
 
     return covered_objects
@@ -342,10 +363,10 @@ def demo_template():
     total_object_count = 0
     total_objects = []
 
-    # hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
+    hA.images = sorted(hA.images, key=lambda obj: obj.image_name, reverse=False)
 
     # True random order
-    random.shuffle(hA.images)
+    # random.shuffle(hA.images)
 
     # hA.images = [i for i in hA.images if i.image_name in ["DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG", "DJI_0062.JPG"]]
 
@@ -366,7 +387,7 @@ def demo_template():
         "DJI_0049.JPG",
         # "DJI_0050.JPG",
         # "DJI_0051.JPG",
-        # "DJI_0052.JPG",
+        "DJI_0052.JPG",
         # "DJI_0053.JPG",
         # "DJI_0054.JPG",
         # "DJI_0055.JPG",
@@ -443,29 +464,22 @@ def demo_template():
             output_path,
             patch_size=patch_size)
 
-
+        stack_annotations = persist_image_stacks(covered_objects, label_classes=hA.label_classes, output_path=output_path)
 
         for i, stack in enumerate(covered_objects):
-            hA_template = copy.deepcopy(hA)
-            with open(output_path / f"template_annotations_{source_image.image_name}_{i}.json", 'w') as json_file:
-                # Serialize the list of Pydantic objects to a list of dictionaries
-                # FIXME this is somehow broken
-                hA_template.images = stack["covered_objects"]
-                json_file.write(hA_template.model_dump_json())
 
-                # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images
-                known_labels.extend( [il.id for i in stack["covered_objects"] for il in i.labels] )
+            # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images
+            known_labels.extend([il.id for i in stack.covered_templates for il in i.labels])
 
-                # total_object_count += len(source_image.labels)
-                total_objects.extend([l.attributes["ID"] for l in stack.get("new_objects")])
-                logger.info(f"Total objects in all images: {len(total_objects)}")
+            total_objects.extend([l.attributes["ID"] for l in stack.new_objects])
+            logger.info(f"Total objects in all images: {len(total_objects)}")
 
-
+            # TODO save the template extends and the covered objects
 
         logger.warning(f"Total objects in all images: {len(total_objects)}")
         logger.warning(f" objects in all images: {sorted(total_objects)}")
 
-
+        return stack_annotations, known_labels
 
 if __name__ == '__main__':
-    demo_template()
+    stack_annotations, known_labels = demo_template()
