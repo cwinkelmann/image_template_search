@@ -137,7 +137,7 @@ def cutout_detection_deduplication(source_image_path: Path,
         # Match and find homography for both full size images
         if ipf.find_patch(similarity_threshold=0.1):
             # Matching to full images
-            logger.info(f"Found Full Image {source_image_path.stem} patch in {large_image.image_name}")
+            logger.info(f"Found {source_image_path.stem} patch in {large_image.image_name}")
 
             ipf.project_image(output_path=output_path)
 
@@ -149,6 +149,7 @@ def cutout_detection_deduplication(source_image_path: Path,
 
             # if frame_polygon.contains(ipf.proj_template_polygon):
             if ipf.proj_template_polygon.within(frame_polygon) or True: # TODO this should not matter. Even if it is not within, it should be projected
+            # if ipf.proj_template_polygon.within(frame_polygon): # TODO this should not matter. Even if it is not within, it should be projected
                 logger.info(f"The small template {template_image_path.stem} frame is within the template polygon")
 
 
@@ -359,7 +360,7 @@ def demo_template():
     output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
 
     known_labels = []
-    patch_size = 1280 # with less than 1280 the matching doesn't work
+    patch_size = 1480 # with less than 1280 the matching doesn't work
     total_object_count = 0
     total_objects = []
 
@@ -384,45 +385,45 @@ def demo_template():
     #               ]]
 
     hA.images = [i for i in hA.images if i.image_name in [
-        "DJI_0049.JPG",
-        # "DJI_0050.JPG",
-        # "DJI_0051.JPG",
-        "DJI_0052.JPG",
-        # "DJI_0053.JPG",
-        # "DJI_0054.JPG",
-        # "DJI_0055.JPG",
-        # "DJI_0056.JPG",
-        # "DJI_0057.JPG",
-        # "DJI_0058.JPG",
-        # "DJI_0059.JPG",
-        # "DJI_0060.JPG",
-        # "DJI_0061.JPG",
-        # "DJI_0062.JPG",
-        "DJI_0063.JPG",  # First image with ID 7
-        # "DJI_0064.JPG",
-        # "DJI_0065.JPG",
-        # "DJI_0066.JPG",
-        # "DJI_0067.JPG",
-        # "DJI_0068.JPG",
-        # "DJI_0069.JPG",
-        # "DJI_0070.JPG",
-        # "DJI_0071.JPG",  # problematic image
-        # "DJI_0072.JPG",
-        # "DJI_0073.JPG",
-        # "DJI_0074.JPG",
-        # "DJI_0075.JPG",
-        # "DJI_0076.JPG",
-        # "DJI_0077.JPG",
-        # "DJI_0078.JPG",
-        # "DJI_0079.JPG",
-        # "DJI_0082.JPG",
-        # "DJI_0085.JPG",
-        # "DJI_0088.JPG",
-        # "DJI_0091.JPG",  # with 71 a probelmatic image
-        # "DJI_0094.JPG",
-        # "DJI_0097.JPG",
-        # "DJI_0100.JPG",
-        # "DJI_0101.JPG",
+                            "DJI_0049.JPG",
+       "DJI_0050.JPG",
+        "DJI_0051.JPG",
+                         "DJI_0052.JPG",
+        "DJI_0053.JPG",
+        "DJI_0054.JPG",
+        "DJI_0055.JPG",
+        "DJI_0056.JPG",
+        "DJI_0057.JPG",
+        "DJI_0058.JPG",
+        "DJI_0059.JPG",
+        "DJI_0060.JPG",
+        "DJI_0061.JPG",
+        "DJI_0062.JPG",
+                         "DJI_0063.JPG",  # First image with ID 7"
+        "DJI_0064.JPG",
+        "DJI_0065.JPG",
+        "DJI_0066.JPG",
+        "DJI_0067.JPG",
+        "DJI_0068.JPG",
+        "DJI_0069.JPG",
+        "DJI_0070.JPG",
+        "DJI_0071.JPG",  # problematic image
+        "DJI_0072.JPG",
+        "DJI_0073.JPG",
+        "DJI_0074.JPG",
+        "DJI_0075.JPG",
+        "DJI_0076.JPG",
+        "DJI_0077.JPG",
+        "DJI_0078.JPG",
+        "DJI_0079.JPG",
+        "DJI_0082.JPG",
+        "DJI_0085.JPG",
+        "DJI_0088.JPG",
+        "DJI_0091.JPG",  # with 71 a probelmatic image
+        "DJI_0094.JPG",
+        "DJI_0097.JPG",
+        "DJI_0100.JPG",
+        "DJI_0101.JPG",
     ]]
 
 
@@ -438,6 +439,7 @@ def demo_template():
 
     # TODO get only the nearest images to the template image
 
+    # for i, source_image in enumerate(hA.images[0:1]):
     for i, source_image in enumerate(hA.images):
         """
         iterate through all images and find the objects in the template image
@@ -449,7 +451,7 @@ def demo_template():
         # TODO set select nearby images only
 
         # TODO save the other images and the source images hA annotations
-        hA.save(output_path / f"test_annotations_{source_image.image_name}.json")
+        # hA.save(output_path / f"test_annotations_{source_image.image_name}.json")
 
         # remove already covered labels from source image
         logger.info(f"Removing known labels {known_labels} from source image {source_image.image_name} to avoid duplications.")
@@ -479,7 +481,7 @@ def demo_template():
         logger.warning(f"Total objects in all images: {len(total_objects)}")
         logger.warning(f" objects in all images: {sorted(total_objects)}")
 
-        return stack_annotations, known_labels
+    # return stack_annotations, known_labels
 
 if __name__ == '__main__':
-    stack_annotations, known_labels = demo_template()
+    demo_template()

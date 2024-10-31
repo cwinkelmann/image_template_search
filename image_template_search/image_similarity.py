@@ -292,7 +292,7 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
     feats1, _ = extractor_wrapper(image_path=image1, max_num_keypoints=10000)
     logger.info(f"DONE extracting features from {image1.name}")
 
-    feats0, image1_T  = extractor_wrapper(image_path=template_image)
+    feats0, image1_T  = extractor_wrapper(image_path=template_image, max_num_keypoints=10000)
     # image1_T = load_image(image1)
 
     img_norm = image1_T / 255.0 if image1_T.max() > 1 else image1_T

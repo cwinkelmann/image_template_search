@@ -90,7 +90,7 @@ for i, source_image in enumerate(hA.images):
 
 # df_hA = get_flat_df(hA)
 # logger.info(f"There are {df_hA['ID'].nunique()} objects with the IDs {sorted(df_hA['ID'].unique())} in the ground truth")
-logger.info(f"There are {len(unique_inner)} objects with the IDs {sorted(unique_inner)} in the ground truth")
+logger.info(f"Ground Truth: are {len(unique_inner)} objects with the IDs {sorted(unique_inner)} in the ")
 
 stacks= []
 for i, a in enumerate(anno):
@@ -98,7 +98,7 @@ for i, a in enumerate(anno):
         hA = hA_from_file(
                 file_path=a)
         df_hA_single = get_flat_df(hA)
-        count_per_template = ([len(image.labels) for image in hA.images])
+        count_per_template = [len(image.labels) for image in hA.images]
 
         mean_igunas = mean(count_per_template)
         stacks.append(mean_igunas)
@@ -108,4 +108,4 @@ for i, a in enumerate(anno):
 
         print(f"IDs iguanas: {sorted(df_hA_single['ID'].unique())}")
 
-print(stacks)
+logger.info(f"Model Estimattion: THere are {sum(stacks)} Object in there in total")
