@@ -6,9 +6,7 @@ from pathlib import Path
 
 import shapely
 from shapely.geometry import Polygon
-from unittest.mock import patch, MagicMock
 
-from streamlit import title
 
 from conf.config_dataclass import CacheConfig
 from detection_deduplication import find_annotated_template_matches, cutout_detection_deduplication

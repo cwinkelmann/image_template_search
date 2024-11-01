@@ -24,9 +24,15 @@ from image_template_search.opencv_findobject_homography import _cached_detect_an
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
 from image_template_search.util.util import get_image_id, cache_to_disk, feature_extractor_cache, generic_cache_to_disk, \
     get_similarity_cache_to_disk
-from lightglue import LightGlue, SIFT
-from lightglue.utils import load_image, rbd
-
+from lightglue import LightGlue, SIFT, viz2d
+from lightglue.utils import load_image, rbd, Extractor
+from lightglue import LightGlue, SuperPoint, DISK
+from lightglue.utils import load_image, rbd, Extractor
+from lightglue import viz2d
+import torch
+from lightglue import SIFT
+from PIL import Image
+import numpy as np
 
 def _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
                                                        tile_size_x, tile_size_y,
@@ -116,10 +122,7 @@ import logging
 
 # Import your existing functions and classes
 from lightglue import LightGlue
-# from extraction import SIFT
-# from utils import rbd, load_image  # Assuming these are defined elsewhere
-import hydra
-from omegaconf import DictConfig
+
 
 # logger = logging.getLogger(__name__)
 
@@ -273,8 +276,39 @@ def matcher_wrapper(feats0, feats1) -> torch.Tensor:
 
     return matches01
 
-@get_similarity_cache_to_disk()
-def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, torch.Tensor):
+def visualise_matches(feats0, feats1, matches01, image0, image1):
+    """
+
+    :param feats0:
+    :param feats1:
+    :param matches01:
+    :param image0:
+    :param image1:
+    :return:
+    """
+
+    feats0, feats1, matches01 = [
+        rbd(x) for x in [feats0, feats1, matches01]
+    ]  # remove batch dimension
+
+    kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches01["matches"]
+    m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
+
+    ## Display the matches
+    axes = viz2d.plot_images([image0, image1])
+    viz2d.plot_matches(m_kpts0, m_kpts1, color="lime", lw=0.2)
+    viz2d.add_text(0, f'Stop after {matches01["stop"]} layers')
+
+    kpc0, kpc1 = viz2d.cm_prune(matches01["prune0"]), viz2d.cm_prune(matches01["prune1"])
+    viz2d.plot_images([image0, image1])
+    viz2d.plot_keypoints([kpts0, kpts1], colors=[kpc0, kpc1], ps=6)
+
+    plt.show()
+
+## TODO readd this
+# @get_similarity_cache_to_disk()
+def get_similarity(template_image: Path,
+                   image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
     get the similarity between two images
     :param template_image:
@@ -285,52 +319,154 @@ def get_similarity(template_image: Path, image1: Path) -> (float, torch.Tensor, 
 
     device = torch.device("cuda" if torch.cuda.is_available() else CacheConfig.device)  # 'mps', 'cpu'
     torch.set_grad_enabled(False)
+    # TODO get the image_size
+    with Image.open(template_image) as img:
+        template_width, template_height = img.size
+    with Image.open(image1) as img:
+        img1_width, img1_height = img.size
+
+    N_x = img1_width // template_width
+    N_y = img1_height // template_height
 
 
-    # image0_T = load_image(template_image)
+    logger.info(f"START extracting features from {template_image.name}")
+    feats0, _ = extractor_wrapper(image_path=template_image, max_num_keypoints=2048)
+    logger.info(f"DONE extracting features from {template_image.name}")
+
     logger.info(f"START extracting features from {image1.name}")
-    feats1, _ = extractor_wrapper(image_path=image1, max_num_keypoints=10000)
+    e = SIFT(max_num_keypoints=2048).eval().to(device)  # load the extractor
+    extractor = TiledExtractor(extractor=e)
+    # TODO bundle this into patched extractor
+
+    feats1 = extractor.extract(image_path = image1, N_x=N_x, N_y=N_y)
     logger.info(f"DONE extracting features from {image1.name}")
 
-    feats0, image1_T  = extractor_wrapper(image_path=template_image, max_num_keypoints=10000)
+    # feats0, image1_T  = extractor_wrapper(image_path=template_image, max_num_keypoints=10000)
     # image1_T = load_image(image1)
 
-    img_norm = image1_T / 255.0 if image1_T.max() > 1 else image1_T
-    black_pixels = torch.all(img_norm < 0.1, dim=0).sum()
-    white_pixels = torch.all(img_norm > 0.9, dim=0).sum()
-    total_pixels = img_norm.shape[1] * img_norm.shape[2]
 
-    if (image1_T.shape[1] > 1000 and image1_T.shape[2] > 1000 and not torch.all(image1_T == 0)
-            and (black_pixels + white_pixels) / total_pixels < 0.5):
+    matches01 = matcher_wrapper(feats0=feats0, feats1=feats1)
+
+    feats0, feats1, matches01 = [
+        rbd(x) for x in [feats0, feats1, matches01]
+    ]  # remove batch dimension
+
+    kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches01["matches"]
+
+    # TODO correct this calculation if the images have a different size
+    normalised_sim = matches.size()[0] / kpts0.size()[0]
+
+    # get matched keypoints only
+    m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
+
+    # TODO visualise the data if necessary
+
+    return normalised_sim, m_kpts0, m_kpts1
 
 
-          # load the extractor
-        # matcher = LightGlue(features="sift").eval().to(device)
 
-        # TODO prevent this to happen again
-        # feats1 = extractor.extract(image1_T.to(device))
+def image_patcher(image_np: np.array, N_x: int, N_y: int):
+    # Get the dimensions of the image
+    height, width, channels = image_np.shape
 
-        # feats0 = extractor.extract(image0_T.to(device))
+    # Calculate tile sizes
+    tile_height = height // N_y
+    tile_width = width // N_x
 
-        matches01 = matcher_wrapper(feats0=feats0, feats1=feats1)
+    patches = []
+    x_offsets = []
+    y_offsets = []
 
-        feats0, feats1, matches01 = [
-            rbd(x) for x in [feats0, feats1, matches01]
-        ]  # remove batch dimension
+    for i in range(N_y):
+        for j in range(N_x):
+            # Calculate coordinates for each tile
+            y_start, y_end = i * tile_height, (i + 1) * tile_height
+            x_start, x_end = j * tile_width, (j + 1) * tile_width
 
-        kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches01["matches"]
+            patch = image_np[y_start:y_end, x_start:x_end]
+            # patches.append(torch.from_numpy(patch).float())
 
-        normalised_sim = matches.size()[0] / kpts0.size()[0]
+            # Calculate and store offsets
+            x_offsets.append(x_start)
+            y_offsets.append(y_start)
 
-        # get matched keypoints only
-        m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
+            # TODO use a temporary diretory / extract the feature directly
+            patch_name = f"DJI_0075_patch_{i}_{j}.jpg"
+            Image.fromarray(patch).save(patch_name)
 
-        return normalised_sim, m_kpts0, m_kpts1
+            patches.append(patch_name)
 
-    else:
-        logger.warning(f"Image too small or not propper: {image1_T.shape}")
-        return 0, torch.tensor([]), torch.tensor([])
+    return patches, x_offsets, y_offsets
 
+
+
+class TiledExtractor:
+    """
+    Little Wrapper to allow for a lightglue matching of very small images to larger images
+    """
+
+    def __init__(self, extractor: Extractor):
+        self.extractor = extractor
+        self.device = torch.device("cuda" if torch.cuda.is_available() else CacheConfig.device)  # 'mps', 'cpu'
+
+    def combine_method(self, patches, height, width, x_offsets, y_offsets):
+        """ Combine the patches
+
+        Args:
+            :param patches:
+            :param height:
+            :param width:
+            :param x_offsets:
+            :param y_offsets:
+            :return:
+        """
+        feats1 = dict()
+
+        features_kp = []
+        features_scales = []
+        features_oris = []
+        features_descriptors = []
+        features_keypoint_scores = []
+        features_image_size = torch.tensor([height, width])
+
+        for i, patched_image in enumerate(patches):
+            p = load_image(patched_image)
+            feats1 = self.extractor.extract(p.to(self.device))
+            # Define the offsets
+            x_offset = x_offsets[i]
+            y_offset = y_offsets[i]
+
+            # Create an offset tensor with the same shape as the coordinates tensor
+            offsets = torch.tensor([x_offset, y_offset])
+
+            features_kp.append(feats1["keypoints"] + offsets)
+            features_scales.append(feats1["scales"])
+            features_oris.append(feats1["oris"])
+            features_descriptors.append(feats1["descriptors"])
+            features_keypoint_scores.append(feats1["keypoint_scores"])
+
+        # concatenate the keypoints
+        feats1["keypoints"] = torch.cat(features_kp, dim=1)
+        feats1["scales"] = torch.cat(features_scales, dim=1)
+        feats1["oris"] = torch.cat(features_oris, dim=1)
+        feats1["descriptors"] = torch.cat(features_descriptors, dim=1)
+        feats1["keypoint_scores"] = torch.cat(features_keypoint_scores, dim=1)
+        feats1["image_size"] = features_image_size
+
+        return feats1
+
+
+    # def extract(self, image_np, N_x, N_y):
+    def extract(self, image_path, N_x, N_y):
+        # Load the image
+        image = Image.open(image_path)
+        image_np = np.array(image)  # Convert to NumPy array
+        height, width, channels = image_np.shape
+
+        patches, x_offsets, y_offsets = image_patcher(image_np, N_x, N_y)
+        feats = self.combine_method(patches, height, width, x_offsets, y_offsets)
+
+        return feats
 
 def find_rotation_gen(m_kpts0: np.ndarray,
                       m_kpts1: np.ndarray,
@@ -783,7 +919,7 @@ class ImagePatchFinder(object):
                                                           Path(self.large_image_path))
 
         if normalised_sim < similarity_threshold:
-            logger.warning("The template is not in the image")
+            logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
             return False
 
         if not isinstance(output_path, Path):

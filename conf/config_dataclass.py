@@ -6,6 +6,6 @@ from pathlib import Path
 class CacheConfig:
     cache_path: str = Path("/Users/christian/PycharmProjects/hnee/image_template_search/similarity_cache")
     visualise: bool = True
-    visualise_info: bool = True
-    show_visualisation: bool = False
+    visualise_info: bool = False
+    show_visualisation: bool = True
     device: str = "cpu"

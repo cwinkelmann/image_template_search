@@ -10,17 +10,11 @@ import sys
 import typing
 from pathlib import Path
 
-import lazy_loader
 from PIL import Image as PILImage
 from loguru import logger
 from matplotlib import pyplot as plt
 from shapely import Polygon
-from shapely.affinity import affine_transform
 
-import hashlib
-
-import hydra
-from omegaconf import DictConfig
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box, project_annotations_to_crop
@@ -41,6 +35,13 @@ from image_template_search.util.util import visualise_polygons, visualise_image,
 
 def persist_image_stacks(covered_objects: typing.List[CoveredObject], label_classes: typing.List[LabelClass],
                          output_path: Path) -> typing.List[HastyAnnotationV2]:
+    """
+
+    :param covered_objects:
+    :param label_classes:
+    :param output_path:
+    :return:
+    """
     stacked_annotations = []
 
     for i, stack in enumerate(covered_objects):
@@ -360,7 +361,7 @@ def demo_template():
     output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
 
     known_labels = []
-    patch_size = 1480 # with less than 1280 the matching doesn't work
+    patch_size = 1280 # with less than 1280 the matching doesn't work
     total_object_count = 0
     total_objects = []
 
@@ -369,61 +370,46 @@ def demo_template():
     # True random order
     # random.shuffle(hA.images)
 
-    # hA.images = [i for i in hA.images if i.image_name in ["DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG", "DJI_0062.JPG"]]
-
-    # hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
-    #                                                       #"DJI_0050.JPG",
-    #                                                       # "DJI_0052.JPG",
-    #                                                       # "DJI_0058.JPG", "DJI_0059.JPG",
-    # #                                                      "DJI_0053.JPG", "DJI_0054.JPG", "DJI_0055.JPG",
-    #                                                       # "DJI_0056.JPG",
-    #                                                       # "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0060.JPG",
-    #                                                       # "DJI_0062.JPG", "DJI_0063.JPG", "DJI_0064.JPG",
-    #                                                          "DJI_0091.JPG",
-    #                                                          "DJI_0094.JPG",
-    #                                                             "DJI_0101.JPG",
-    #               ]]
-
     hA.images = [i for i in hA.images if i.image_name in [
                             "DJI_0049.JPG",
-       "DJI_0050.JPG",
-        "DJI_0051.JPG",
-                         "DJI_0052.JPG",
-        "DJI_0053.JPG",
-        "DJI_0054.JPG",
-        "DJI_0055.JPG",
-        "DJI_0056.JPG",
-        "DJI_0057.JPG",
-        "DJI_0058.JPG",
-        "DJI_0059.JPG",
-        "DJI_0060.JPG",
-        "DJI_0061.JPG",
-        "DJI_0062.JPG",
-                         "DJI_0063.JPG",  # First image with ID 7"
-        "DJI_0064.JPG",
-        "DJI_0065.JPG",
-        "DJI_0066.JPG",
-        "DJI_0067.JPG",
-        "DJI_0068.JPG",
-        "DJI_0069.JPG",
-        "DJI_0070.JPG",
-        "DJI_0071.JPG",  # problematic image
-        "DJI_0072.JPG",
-        "DJI_0073.JPG",
-        "DJI_0074.JPG",
-        "DJI_0075.JPG",
-        "DJI_0076.JPG",
-        "DJI_0077.JPG",
-        "DJI_0078.JPG",
-        "DJI_0079.JPG",
-        "DJI_0082.JPG",
-        "DJI_0085.JPG",
-        "DJI_0088.JPG",
-        "DJI_0091.JPG",  # with 71 a probelmatic image
-        "DJI_0094.JPG",
-        "DJI_0097.JPG",
-        "DJI_0100.JPG",
-        "DJI_0101.JPG",
+       # "DJI_0050.JPG",
+       #  "DJI_0051.JPG",
+       #                  "DJI_0052.JPG",
+        # "DJI_0053.JPG",
+        # "DJI_0054.JPG",
+        # "DJI_0055.JPG",
+        # "DJI_0056.JPG",
+        # "DJI_0057.JPG",
+        # "DJI_0058.JPG",
+        # "DJI_0059.JPG",
+        # "DJI_0060.JPG",
+        # "DJI_0061.JPG",
+        # "DJI_0062.JPG",
+        #                 "DJI_0063.JPG",  # First image with ID 7"
+        # "DJI_0064.JPG",
+        # "DJI_0065.JPG",
+        # "DJI_0066.JPG",
+        # "DJI_0067.JPG",
+        # "DJI_0068.JPG",
+        # "DJI_0069.JPG",
+        # "DJI_0070.JPG",
+        "DJI_0071.JPG",  # problematic image, not part of 49
+        # "DJI_0072.JPG",
+        # "DJI_0073.JPG",
+        # "DJI_0074.JPG",
+        "DJI_0075.JPG",   # 49-75 ID:9 hard to match
+        # "DJI_0076.JPG",
+        # "DJI_0077.JPG",
+        # "DJI_0078.JPG",
+        # "DJI_0079.JPG",
+        # "DJI_0082.JPG",
+        # "DJI_0085.JPG",
+        # "DJI_0088.JPG",
+        # "DJI_0091.JPG",  # with 71 a probelmatic image
+        # "DJI_0094.JPG",
+        # "DJI_0097.JPG",
+        # "DJI_0100.JPG",
+        # "DJI_0101.JPG",
     ]]
 
 
