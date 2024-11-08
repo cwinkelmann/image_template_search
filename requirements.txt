@@ -3,3 +3,8 @@ shapely==2.0.6
 joblib==1.4.2
 pydantic==2.9.2
 pandas==2.2.3
+pytest==8.3.3
+fiftyone==1.0.1
+torch==2.5.1
+
+#  pip install fiftyone pandas pydantic joblib shapely loguru pytest

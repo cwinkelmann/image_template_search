@@ -4,7 +4,6 @@ Count igunas based on annotations which are in a stack of images
 from pathlib import Path
 from statistics import mean
 
-import attr
 from loguru import logger
 from matplotlib import pyplot as plt
 from shapely import Polygon
@@ -29,20 +28,20 @@ images_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplicati
 hA = hA_from_file(
         file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_10.json"))
 
-hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
-                                                      #"DJI_0050.JPG", "DJI_0051.JPG",
-                                                      "DJI_0052.JPG",
-                                                      # "DJI_0053.JPG",
-                                                      # "DJI_0054.JPG", "DJI_0055.JPG",
-                                                      # "DJI_0056.JPG",
-                                                      # "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
-                                                      # "DJI_0060.JPG",
-                                                      # "DJI_0061.JPG",
-                                                      # "DJI_0062.JPG",
-                                                      "DJI_0063.JPG",  # First image with ID 7
-                                                      # "DJI_0064.JPG",
-                                                      # "DJI_0065.JPG",
-                                                      ]]
+# hA.images = [i for i in hA.images if i.image_name in ["DJI_0049.JPG",
+#                                                       #"DJI_0050.JPG", "DJI_0051.JPG",
+#                                                       "DJI_0052.JPG",
+#                                                       # "DJI_0053.JPG",
+#                                                       # "DJI_0054.JPG", "DJI_0055.JPG",
+#                                                       # "DJI_0056.JPG",
+#                                                       # "DJI_0057.JPG", "DJI_0058.JPG", "DJI_0059.JPG",
+#                                                       # "DJI_0060.JPG",
+#                                                       # "DJI_0061.JPG",
+#                                                       # "DJI_0062.JPG",
+#                                                       "DJI_0063.JPG",  # First image with ID 7
+#                                                       # "DJI_0064.JPG",
+#                                                       # "DJI_0065.JPG",
+#                                                       ]]
 
 
 
@@ -108,4 +107,4 @@ for i, a in enumerate(anno):
 
         print(f"IDs iguanas: {sorted(df_hA_single['ID'].unique())}")
 
-logger.info(f"Model Estimattion: THere are {sum(stacks)} Object in there in total")
+logger.info(f"Model Estimattion: There are {sum(stacks)} Object in there in total")

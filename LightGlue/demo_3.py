@@ -30,8 +30,18 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 'mps', 'cpu'
 
     N_x, N_y = 2, 2
-    small_image_path = "/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/template_source_DJI_0049.JPG__a02b70954a14ab0a16eb97ff187e44ecc9c0e8f0437a1b33ce56e5e0cce1f413__1280.jpg"
-    image_path = "/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/single_images/DJI_0075.JPG"
+    small_image_path = "/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/template_source_DJI_0049.JPG__a2b2d449e28f761a9d8019ccdcc7fcde06e7c2ead9fa3c71c3f21321953d6259__1280.jpg"
+    image_path = "/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/single_images/DJI_0077.JPG"
+
+    # seems to work fine
+    small_image_path = "/Users/christian/PycharmProjects/hnee/image_template_search/LightGlue/DJI_0075_patch_1_1.jpg"
+    image_path = "/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/output/cropped_mosaic_100_DJI_0066.jpg"
+
+    # the actual difficult case
+    small_image_path = Path(
+        "/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/single_images/DJI_0066.JPG")
+    image_path = Path(
+        "/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/mosaics/mosaic_100.jpg")
 
     e = SIFT(max_num_keypoints=6096).eval().to(device)  # load the extractor
     extractor = TiledExtractor(extractor=e)
@@ -43,7 +53,6 @@ if __name__ == '__main__':
     e = SIFT(max_num_keypoints=6096).eval().to(device)  # load the extractor
     image0 = load_image(small_image_path)
     feats0 = e.extract(image0.to(device))
-
 
 
     matcher = LightGlue(features="sift").eval().to(device)

@@ -13,7 +13,6 @@ import PIL.Image
 import matplotlib.pyplot as plt
 import numpy as np
 import shapely
-import torch
 from loguru import logger
 from shapely.affinity import affine_transform
 
@@ -29,7 +28,6 @@ from lightglue.utils import load_image, rbd, Extractor
 from lightglue import LightGlue, SuperPoint, DISK
 from lightglue.utils import load_image, rbd, Extractor
 from lightglue import viz2d
-import torch
 from lightglue import SIFT
 from PIL import Image
 import numpy as np
@@ -261,16 +259,16 @@ def extractor_wrapper(image_path: Path, max_num_keypoints=8000) -> typing.Tuple[
     """
 
     extractor = SIFT(max_num_keypoints=max_num_keypoints).eval().to(CacheConfig.device)
+    # extractor = SuperPoint(max_num_keypoints=max_num_keypoints).eval().to(CacheConfig.device)
     image = load_image(image_path)
     feats = extractor.extract(image.to(CacheConfig.device))
-
 
     return feats, image
 
 # @generic_cache_to_disk()
-def matcher_wrapper(feats0, feats1) -> torch.Tensor:
+def matcher_wrapper(feats0, feats1, feature_type="sift") -> torch.Tensor:
     logger.info(f"Start matching")
-    matcher = LightGlue(features="sift").eval().to(CacheConfig.device)
+    matcher = LightGlue(features=feature_type).eval().to(CacheConfig.device)
     matches01 = matcher({"image0": feats0, "image1": feats1})
     logger.info(f"Done matching")
 
@@ -305,8 +303,8 @@ def visualise_matches(feats0, feats1, matches01, image0, image1):
 
     plt.show()
 
-## TODO readd this
-# @get_similarity_cache_to_disk()
+### TODO readd this
+@get_similarity_cache_to_disk()
 def get_similarity(template_image: Path,
                    image1: Path) -> (float, torch.Tensor, torch.Tensor):
     """
@@ -327,14 +325,21 @@ def get_similarity(template_image: Path,
 
     N_x = img1_width // template_width
     N_y = img1_height // template_height
+    max_num_keypoints = CacheConfig.max_num_keypoints
 
+    # if img1_width - 1000 > template_width and img1_height - 1000 > template_height:
+    #     N_x = N_y = 2 # TODO evaluate this
+    N_x = 2
+    N_y = 2
+    logger.info(f"Using {N_x} x {N_y} tiles")
 
     logger.info(f"START extracting features from {template_image.name}")
-    feats0, _ = extractor_wrapper(image_path=template_image, max_num_keypoints=2048)
+    feats0, _ = extractor_wrapper(image_path=template_image, max_num_keypoints=max_num_keypoints)
     logger.info(f"DONE extracting features from {template_image.name}")
 
     logger.info(f"START extracting features from {image1.name}")
-    e = SIFT(max_num_keypoints=2048).eval().to(device)  # load the extractor
+    e = SIFT(max_num_keypoints=max_num_keypoints ).eval().to(device)  # load the extractor
+    # e = SuperPoint(max_num_keypoints=max_num_keypoints ).eval().to(device)  # load the extractor
     extractor = TiledExtractor(extractor=e)
     # TODO bundle this into patched extractor
 
@@ -345,7 +350,8 @@ def get_similarity(template_image: Path,
     # image1_T = load_image(image1)
 
 
-    matches01 = matcher_wrapper(feats0=feats0, feats1=feats1)
+    # matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="superpoint")
+    matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="sift")
 
     feats0, feats1, matches01 = [
         rbd(x) for x in [feats0, feats1, matches01]
@@ -360,6 +366,19 @@ def get_similarity(template_image: Path,
     m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
     # TODO visualise the data if necessary
+    if CacheConfig.visualise_info:
+        ## Display the matches
+        image0 = load_image(template_image)
+        image1 = load_image(image1)
+        axes = viz2d.plot_images([image0, image1])
+        viz2d.plot_matches(m_kpts0, m_kpts1, color="lime", lw=0.2)
+        viz2d.add_text(0, f'Stop after {matches01["stop"]} layers')
+
+        kpc0, kpc1 = viz2d.cm_prune(matches01["prune0"]), viz2d.cm_prune(matches01["prune1"])
+        viz2d.plot_images([image0, image1])
+        viz2d.plot_keypoints([kpts0, kpts1], colors=[kpc0, kpc1], ps=6)
+
+        plt.show()
 
     return normalised_sim, m_kpts0, m_kpts1
 
@@ -390,7 +409,7 @@ def image_patcher(image_np: np.array, N_x: int, N_y: int):
             x_offsets.append(x_start)
             y_offsets.append(y_start)
 
-            # TODO use a temporary diretory / extract the feature directly
+            # TODO use a temporary directory / extract the feature directly
             patch_name = f"DJI_0075_patch_{i}_{j}.jpg"
             Image.fromarray(patch).save(patch_name)
 
@@ -440,15 +459,18 @@ class TiledExtractor:
             offsets = torch.tensor([x_offset, y_offset])
 
             features_kp.append(feats1["keypoints"] + offsets)
-            features_scales.append(feats1["scales"])
-            features_oris.append(feats1["oris"])
+            if isinstance(self.extractor, SIFT):
+                features_scales.append(feats1["scales"])
+                features_oris.append(feats1["oris"])
+
             features_descriptors.append(feats1["descriptors"])
             features_keypoint_scores.append(feats1["keypoint_scores"])
 
         # concatenate the keypoints
         feats1["keypoints"] = torch.cat(features_kp, dim=1)
-        feats1["scales"] = torch.cat(features_scales, dim=1)
-        feats1["oris"] = torch.cat(features_oris, dim=1)
+        if isinstance(self.extractor, SIFT):
+            feats1["scales"] = torch.cat(features_scales, dim=1)
+            feats1["oris"] = torch.cat(features_oris, dim=1)
         feats1["descriptors"] = torch.cat(features_descriptors, dim=1)
         feats1["keypoint_scores"] = torch.cat(features_keypoint_scores, dim=1)
         feats1["image_size"] = features_image_size
@@ -483,6 +505,8 @@ def find_rotation_gen(m_kpts0: np.ndarray,
     ransac_reproj_threshold = 5.0
     logger.info(f"RANSAC Threshold: {ransac_reproj_threshold}")
     M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, ransac_reproj_threshold)
+
+    # TODO integrate kornia findHomography in here
     img1 = cv2.imread(str(image_name), cv2.IMREAD_GRAYSCALE)
     h, w = img1.shape
     pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
@@ -918,16 +942,21 @@ class ImagePatchFinder(object):
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path,
                                                           Path(self.large_image_path))
 
-        if normalised_sim < similarity_threshold:
+
+        if normalised_sim < similarity_threshold or len(m_kpts0) < 10 or len(m_kpts1) < 10:
             logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
+            logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
+
             return False
 
         if not isinstance(output_path, Path):
             output_path = Path(output_path)
 
+        logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
         M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
                                                m_kpts1.cpu().numpy(),
                                                image_name=self.large_image_path)
+
         self.M = M
         self.M_ = np.linalg.inv(M)
         self.mask = mask
@@ -963,6 +992,7 @@ class ImagePatchFinder(object):
 
         matched_source_image = f"warped_source_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
 
+        Path(output_path).mkdir(exist_ok=True, parents=True)
         warped_other_image_path = output_path / matched_source_image
         cv2.imwrite(str(warped_other_image_path), cv2.cvtColor(self.warped_image_B, cv2.COLOR_RGB2BGR))
 

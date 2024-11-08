@@ -54,7 +54,7 @@ def persist_image_stacks(covered_objects: typing.List[CoveredObject], label_clas
 
     return stacked_annotations
 
-def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
+def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
     """
     Find objects in the image and return them as a list of lists of ImageLabels and a list of polygons
 
@@ -64,25 +64,33 @@ def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]],
     :param patch_size:
     :return:
     """
+    if isinstance(image, Image):
+        logger.warning(f"passing the Image is deprecated, please pass just the labels" )
+        image_labels = image.labels
+    else:
+        image_labels = image
+
     covered_objects = []
 
     template_annotations = []
     template_extents = []
 
-    image.labels.sort(key=lambda label: label.attributes.get("distance_to_nearest_edge", float('inf')), reverse=True)
+
+
+    image_labels.sort(key=lambda label: label.attributes.get("distance_to_nearest_edge", float('inf')), reverse=True)
 
     ## TODO polygons until all covered.
 
-    for l in image.labels:
+    for l in image_labels:
         if l not in covered_objects:
             if l.attributes.get("distance_to_nearest_edge", float("inf")) > patch_size / 2:
                 # the current object is covered
-                every_other_label = [il for il in image.labels if il not in covered_objects]
+                every_other_label = [il for il in image_labels if il not in covered_objects]
                 pc = l.bbox_polygon.centroid
 
                 buffer = create_box_around_point(pc, a=patch_size, b=patch_size)
 
-                covered_objects.extend([l for l in image.labels if buffer.contains(l.centroid)])
+                covered_objects.extend([l for l in image_labels if buffer.contains(l.centroid)])
 
                 cropped_annotations, buffer = project_annotations_to_crop(buffer=buffer,
                                                                           imagelabels=every_other_label)
@@ -93,8 +101,8 @@ def find_objects(image: Image, patch_size=1280) -> tuple[list[list[ImageLabel]],
                 logger.warning(f"Label {l.attributes.get('ID')} is too close to the edge, skipping")
 
     covered_ids = {label.id for label in covered_objects}
-    uncovered_labels = [label for label in image.labels if label.id not in covered_ids]
-    covered_labels = [label for label in image.labels if label.id in covered_ids]
+    uncovered_labels = [label for label in image_labels if label.id not in covered_ids]
+    covered_labels = [label for label in image_labels if label.id in covered_ids]
 
     return template_annotations, template_extents, covered_labels, uncovered_labels
 
@@ -228,6 +236,10 @@ def cutout_detection_deduplication(source_image_path: Path,
     return covered_objects
 
 
+
+
+
+
 def find_annotated_template_matches(images_path: Path,
                                     source_image: Image,
                                     other_images: list[Image],
@@ -294,8 +306,6 @@ def find_annotated_template_matches(images_path: Path,
 
     for i, t in enumerate(templates):
         # Iterate through the templates and find the objects in the other images
-
-
 
         combined_hash = hash_objects(objs=objs_in_template[i])
         # template_id = f"{source_image.image_name}_{combined_hash}_{patch_size}"
@@ -371,45 +381,48 @@ def demo_template():
     # random.shuffle(hA.images)
 
     hA.images = [i for i in hA.images if i.image_name in [
-                            "DJI_0049.JPG",
+                            # "DJI_0049.JPG",
        # "DJI_0050.JPG",
        #  "DJI_0051.JPG",
        #                  "DJI_0052.JPG",
-        # "DJI_0053.JPG",
-        # "DJI_0054.JPG",
-        # "DJI_0055.JPG",
-        # "DJI_0056.JPG",
-        # "DJI_0057.JPG",
-        # "DJI_0058.JPG",
-        # "DJI_0059.JPG",
-        # "DJI_0060.JPG",
-        # "DJI_0061.JPG",
-        # "DJI_0062.JPG",
+       #  "DJI_0053.JPG",
+       #  "DJI_0054.JPG",
+       #  "DJI_0055.JPG",
+       #  "DJI_0056.JPG",
+       #  "DJI_0057.JPG",
+       #  "DJI_0058.JPG",
+       #  "DJI_0059.JPG",
+       #  "DJI_0060.JPG",
+       #  "DJI_0061.JPG",
+       #  "DJI_0062.JPG",
         #                 "DJI_0063.JPG",  # First image with ID 7"
         # "DJI_0064.JPG",
-        # "DJI_0065.JPG",
-        # "DJI_0066.JPG",
-        # "DJI_0067.JPG",
-        # "DJI_0068.JPG",
-        # "DJI_0069.JPG",
-        # "DJI_0070.JPG",
-        "DJI_0071.JPG",  # problematic image, not part of 49
-        # "DJI_0072.JPG",
-        # "DJI_0073.JPG",
-        # "DJI_0074.JPG",
-        "DJI_0075.JPG",   # 49-75 ID:9 hard to match
-        # "DJI_0076.JPG",
-        # "DJI_0077.JPG",
+       #  "DJI_0065.JPG",
+       #  "DJI_0066.JPG",
+       #  "DJI_0067.JPG",
+       #  "DJI_0068.JPG",
+       #  "DJI_0069.JPG",
+       #  "DJI_0070.JPG",
+        # "DJI_0071.JPG",  # problematic image, not part of 49
+       #  "DJI_0072.JPG",
+       #  "DJI_0073.JPG",
+       #  "DJI_0074.JPG",
+       "DJI_0075.JPG",   # 49-75 ID:9 hard to match
+       #  "DJI_0076.JPG",
+        #"DJI_0077.JPG",
         # "DJI_0078.JPG",
         # "DJI_0079.JPG",
         # "DJI_0082.JPG",
         # "DJI_0085.JPG",
-        # "DJI_0088.JPG",
-        # "DJI_0091.JPG",  # with 71 a probelmatic image
+
+
+       #  "DJI_0088.JPG",
+
+         "DJI_0091.JPG",  # with 71 a probelmatic image
         # "DJI_0094.JPG",
         # "DJI_0097.JPG",
         # "DJI_0100.JPG",
-        # "DJI_0101.JPG",
+        "DJI_0101.JPG",
     ]]
 
 
@@ -452,11 +465,11 @@ def demo_template():
             output_path,
             patch_size=patch_size)
 
+        # TODO is this actually what it should.
         stack_annotations = persist_image_stacks(covered_objects, label_classes=hA.label_classes, output_path=output_path)
 
+        # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images
         for i, stack in enumerate(covered_objects):
-
-            # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images
             known_labels.extend([il.id for i in stack.covered_templates for il in i.labels])
 
             total_objects.extend([l.attributes["ID"] for l in stack.new_objects])

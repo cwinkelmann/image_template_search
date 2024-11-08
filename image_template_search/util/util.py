@@ -137,7 +137,7 @@ def get_similarity_cache_to_disk():
             cache_file_ = os.path.join(cache_dir, f"cache_find_similarity_{image1.name}_{image0.name}_{cache_key_}.pkl")
 
             # Check if cache exists
-            if os.path.exists(cache_file):
+            if os.path.exists(cache_file) and CacheConfig.caching:
                 # Load cached result
                 logger.info(f"Loading cached result for {image0.stem} and {image1.stem}")
                 return joblib.load(cache_file)
@@ -192,12 +192,24 @@ def hash_objects(objs: list[ImageLabel]) -> str:
 
 def visualise_polygons(polygons: List[shapely.Polygon] = (),
                        points: List[shapely.Point] = (),
-                       filename=None, show=False, title = None,
+                       filename=None, show=False, title=None,
                        max_x=None, max_y=None, color="blue",
-                       ax:axes.Axes =None, linewidth=0.5, markersize=0.5, fontsize=22,
+                       ax: axes.Axes = None, linewidth=0.5, markersize=0.5, fontsize=22,
                        labels: List[str] = None) -> axes.Axes:
     """
     Visualize a list of polygons
+    :param labels:
+    :param fontsize:
+    :param markersize:
+    :param linewidth:
+    :param ax:
+    :param color:
+    :param max_y:
+    :param max_x:
+    :param title:
+    :param show:
+    :param filename:
+    :param points:
     :param polygons:
     :return:
     """
@@ -266,7 +278,7 @@ def visualise_image(image_path: Path = None,
 
     if show:
         plt.show()
-        # sleep(0.1)
+        return ax
     else:
         return ax
 
@@ -315,7 +327,22 @@ def calculate_nearest_border_distance(centroids: list[shapely.Point], frame_widt
         # logger.info(f"  Nearest Distance to Border: {nearest_distance}")
     return distances
 
+def crop_image_bounds(image: typing.Union[PILImage, np.ndarray, Path], polygon: Polygon)-> PILImage:
+    # Get the bounding box coordinates (minx, miny, maxx, maxy)
+    minx, miny, maxx, maxy = polygon.bounds
 
+    if image is not None and isinstance(image, Path):
+        image = PILImage.open(image)
+
+    # Ensure the bounding box fits within the image dimensions
+    img_width, img_height = image.size
+    minx, miny = max(0, minx), max(0, miny)
+    maxx, maxy = min(img_width, maxx), min(img_height, maxy)
+
+    # Crop the image using the bounding box
+    cropped_image = image.crop((minx, miny, maxx, maxy))
+
+    return cropped_image
 
 def crop_templates_from_image(image: typing.Union[PILImage, np.ndarray], bbox_polygons: List[Polygon]) -> List[PILImage]:
     """
