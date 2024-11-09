@@ -185,7 +185,7 @@ def hash_objects(objs: list[ImageLabel]) -> str:
 
     hash_object = hashlib.sha256(hashes.encode())
     # Return a truncated version of the hash (e.g., first 10 characters)
-    combined_hash = hash_object.hexdigest()
+    combined_hash = hash_object.hexdigest()[0:10]
 
     return combined_hash
 
@@ -285,7 +285,7 @@ def visualise_image(image_path: Path = None,
 
 
 
-def create_box_around_point(center: Point, a: float, b: float) -> box:
+def create_box_around_point(center: Point, a: float, b: float, image_width = None, image_height = None) -> box:
     """
     create a bounding box around a point
     """
@@ -296,6 +296,22 @@ def create_box_around_point(center: Point, a: float, b: float) -> box:
     maxx = x_center + a / 2
     miny = y_center - b / 2
     maxy = y_center + b / 2
+
+    if image_width is not None and image_height is not None:
+        # Adjust the box position to stay within image boundaries, without changing its dimensions
+        if minx < 0:
+            minx = 0
+            maxx = a
+        elif maxx > image_width:
+            maxx = image_width
+            minx = image_width - a
+
+        if miny < 0:
+            miny = 0
+            maxy = b
+        elif maxy > image_height:
+            maxy = image_height
+            miny = image_height - b
 
     # Create a box with these bounds
     return box(minx, miny, maxx, maxy)

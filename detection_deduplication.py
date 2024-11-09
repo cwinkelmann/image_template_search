@@ -54,12 +54,13 @@ def persist_image_stacks(covered_objects: typing.List[CoveredObject], label_clas
 
     return stacked_annotations
 
-def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
+def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280, individual=False, edge=False) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
     """
     Find objects in the image and return them as a list of lists of ImageLabels and a list of polygons
 
 
     # TODO describe the function properly
+    :param individual:
     :param image:
     :param patch_size:
     :return:
@@ -75,15 +76,13 @@ def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280) -> tup
     template_annotations = []
     template_extents = []
 
-
-
     image_labels.sort(key=lambda label: label.attributes.get("distance_to_nearest_edge", float('inf')), reverse=True)
 
     ## TODO polygons until all covered.
 
     for l in image_labels:
-        if l not in covered_objects:
-            if l.attributes.get("distance_to_nearest_edge", float("inf")) > patch_size / 2:
+        if l not in covered_objects or individual:
+            if l.attributes.get("distance_to_nearest_edge", float("inf")) > patch_size / 2 or edge:
                 # the current object is covered
                 every_other_label = [il for il in image_labels if il not in covered_objects]
                 pc = l.bbox_polygon.centroid
@@ -105,6 +104,51 @@ def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280) -> tup
     covered_labels = [label for label in image_labels if label.id in covered_ids]
 
     return template_annotations, template_extents, covered_labels, uncovered_labels
+
+
+def find_objects_individual_all(labels : typing.List[ImageLabel],
+                                patch_size=1280,
+                                image_width=None,
+                                image_height=None) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel]]:
+    """
+    get all objects no matter if they are duplicate or too close to the edge
+
+    # TODO describe the function properly
+    :param individual:
+    :param image:
+    :param patch_size:
+    :return:
+    """
+    cropped_annotations = []
+    template_annotations = []
+    template_extents = []
+
+    labels.sort(key=lambda label: label.attributes.get("distance_to_nearest_edge", float('inf')), reverse=True)
+
+    for l in labels:
+        pc = l.bbox_polygon.centroid
+        buffer = create_box_around_point(pc, a=patch_size, b=patch_size, image_width=image_width, image_height=image_height)
+
+        covered_objects = ([l for l in labels if buffer.contains(l.centroid)])
+        assert pc.within(buffer), f"Centroid {pc} is not within the buffer {buffer}"
+
+        cropped_object, buffer = project_annotations_to_crop(buffer=buffer,
+                                                                  imagelabels=[l])
+        cropped_object = cropped_object[0]
+
+        cropped_covered_annotations, buffer = project_annotations_to_crop(buffer=buffer,
+                                                                  imagelabels=covered_objects)
+
+        cropped_annotations.append(cropped_object)
+
+        template_annotations.append(covered_objects)
+        template_extents.append(buffer)
+
+
+    return template_annotations, template_extents, cropped_annotations
+
+
+
 
 
 def cutout_detection_deduplication(source_image_path: Path,

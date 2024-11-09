@@ -502,7 +502,7 @@ def find_rotation_gen(m_kpts0: np.ndarray,
     """
     if isinstance(image_name, str):
         image_name = Path(image_name)
-    ransac_reproj_threshold = 5.0
+    ransac_reproj_threshold = 3.0
     logger.info(f"RANSAC Threshold: {ransac_reproj_threshold}")
     M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, ransac_reproj_threshold)
 

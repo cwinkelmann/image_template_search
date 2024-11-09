@@ -8,6 +8,7 @@ This entails matching the image to a potentially quite big geotiff/jpf
 import copy
 import gc
 import typing
+from cProfile import label
 from pathlib import Path
 
 from loguru import logger
@@ -16,10 +17,11 @@ from shapely.geometry.polygon import Polygon
 from PIL import Image as PILImage
 
 from conf.config_dataclass import CacheConfig
-from detection_deduplication import find_objects
+from detection_deduplication import find_objects, find_objects_individual_all
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box
 from image_template_search.util.CoveredObjectType import CoveredObject
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, Image
+from image_template_search.util.TemplateDataType import TemplateData
 from image_template_search.util.util import visualise_image, visualise_polygons, calculate_nearest_border_distance, \
     crop_templates_from_image, crop_image_bounds, hash_objects, get_template_id
 from tests.test_detection_deduplication import output_path
@@ -27,37 +29,60 @@ from tests.test_detection_deduplication import output_path
 
 def drone_template_orthomosaic_localization(template_image_path: Path, large_image_path: Path,
                                             drone_image_labels: typing.List[ImageLabel] = None):
-    patch_size_offset = 300
+    # TODO extract this
     width = 5472
     height = 3648
     template_extent = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
 
-    objs_in_templates, template_extents, covered_labels, uncovered_labels = find_objects(drone_image_labels,
-                                                                                         patch_size=CacheConfig.patch_size + patch_size_offset)
+    # FIXME the objects should not be grouped together. Each object needs to extracted individually. It is not about the
+    # counting but correct projection of the label-coordinates
+    template_annotations, template_extents, cropped_annotations = find_objects_individual_all(drone_image_labels,
+                                                                                         patch_size=CacheConfig.patch_size,
+                                                                                              image_width=width,
+                                                                                              image_height=height)
 
     p_image = PILImage.open(
-        large_image_path)  # Replace with your image file path
+        template_image_path)  # Replace with your image file path
 
     templates = crop_templates_from_image(image=p_image,
                                           bbox_polygons=template_extents)
 
+    source_image_collection = []
+    # get the original images objects
+    for obj_in_template, template_image, template_cutout_extent in zip(cropped_annotations, templates, template_extents):
 
+        combined_hash = hash_objects(objs=[obj_in_template])
+        template_id = get_template_id(image_name=template_image_path.stem,
+                                    combined_hash=combined_hash,
+                                    patch_size=CacheConfig.patch_size)
+
+        template_cutout_image_path = output_path / f"template_source_{template_id}.jpg"
+        template_image.save(template_cutout_image_path)
+
+        source_image_collection.append(TemplateData(
+            template_image_path=template_cutout_image_path,
+            template_extent=template_cutout_extent,
+            center_obj_template=obj_in_template,
+            template_image=template_image)
+        )
+
+    ## find the rough location of the template drone image in the orthomosaic
     ipf_t = ImagePatchFinder(template_path=template_image_path,
                              template_polygon=template_extent,
                              large_image_path=large_image_path)
 
-
     found_match = ipf_t.find_patch(similarity_threshold=0.0005)
 
     # This is just for visualisation
-    warped_path = ipf_t.project_image(output_path=large_image_path.parent / "warped")
+    # warped_path = ipf_t.project_image(output_path=large_image_path.parent / "warped")
 
-    # TODO project the labels on the drone image to the orthomosaic
     if found_match:
         logger.info(f"Found template {template_image_path.stem} object is in the image {large_image_path.stem}")
 
     ax_image = visualise_image(image_path=large_image_path, show=False, title="Orthomosaic")
-    visualise_polygons([ipf_t.proj_template_polygon], show=True, ax=ax_image, color="red", linewidth=4.5)
+    visualise_polygons([ipf_t.proj_template_polygon],
+                       labels=["template extent"],
+                       show=CacheConfig.visualise_info, ax=ax_image, color="red", linewidth=4.5)
 
 
     # project the labels from the large image to the template, therefore using their ids
@@ -68,15 +93,15 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
         # ax_image_w = visualise_image(image_path=warped_path, show=False, title="Warped Orthomosaic")
         # # ax_image_w = visualise_polygons(polygons=[x.bbox_polygon for x in small_image_proj_labels], show=True, ax=ax_image_w)
         # ax_image_w = visualise_polygons(polygons=[x.bbox_polygon for x in drone_image_labels], show=True, ax=ax_image_w, linewidth=4, color="red")
-        #
-        # # projected labels
-        # ax_image_w = visualise_image(image_path=large_image_path, show=False, title="Original Orthomosaic", dpi=180)
-        # ax_image_w = visualise_polygons(polygons=[x.bbox_polygon for x in small_image_proj_labels], show=True, ax=ax_image_w, linewidth=4, color="red")
-        # # TODO export these labels now
+
+        # projected labels
+        ax_image_w = visualise_image(image_path=large_image_path, show=False, title="Original Orthomosaic", dpi=180)
+        ax_image_w = visualise_polygons(polygons=[x.bbox_polygon for x in small_image_proj_labels], show=CacheConfig.visualise_info, ax=ax_image_w, linewidth=4, color="red")
+
 
         # cut the projected labels with a larger patch size
-        objs_in_templates, template_extents, covered_labels, uncovered_labels = find_objects(small_image_proj_labels,
-                                                                                            patch_size=CacheConfig.patch_size + patch_size_offset)
+        template_annotations, template_extents, cropped_annotations = find_objects_individual_all(small_image_proj_labels,
+                                                                                            patch_size=CacheConfig.patch_size + CacheConfig.patch_size_offset)
 
         p_image = PILImage.open(
             large_image_path)  # Replace with your image file path
@@ -84,24 +109,79 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
         templates = crop_templates_from_image(image=p_image,
                                               bbox_polygons=template_extents)
 
+        destination_image_collection = []
 
-        for objs_in_template_i, template_image, template_extent in zip(objs_in_templates, templates, template_extents):
 
-            ax_i = visualise_image(image = template_image, show=False)
-            visualise_polygons(polygons=[x.bbox_polygon for x in objs_in_template_i],
-                               ax=ax_i, show=True,
+        for obj_in_template, template_image_mosaic, template_mosaic_extent in zip(cropped_annotations, templates, template_extents):
+
+            ax_i = visualise_image(image = template_image_mosaic, show=False, title="Orthomosaic cutout")
+            visualise_polygons(polygons=[obj_in_template.bbox_polygon],
+                               labels=[obj_in_template.attributes.get("ID", "undefined")],
+                               ax=ax_i, show=CacheConfig.visualise_info,
                                color="red", linewidth=2.5)
 
-            combined_hash = hash_objects(objs=objs_in_template_i)
+            combined_hash = hash_objects(objs=[obj_in_template])
             template_id = get_template_id(image_name=template_image_path.stem,
                                           combined_hash=combined_hash,
-                                          patch_size=CacheConfig.patch_size + patch_size_offset)
+                                          patch_size=CacheConfig.patch_size + CacheConfig.patch_size_offset)
 
-            template_image_path = output_path / f"template_{template_id}.jpg"
-            template_image.save(template_image_path)
+            template_image_mosaic_path = output_path / f"template_mosaic_{template_id}.jpg"
+            template_image_mosaic.save(template_image_mosaic_path)
+
+            destination_image_collection.append(TemplateData(
+                template_image_path=template_image_mosaic_path,
+                template_extent=template_mosaic_extent,
+                center_obj_template=obj_in_template,
+                template_image=template_image_mosaic)
+            )
 
             # TODO find the patches of the single image in the drone image
 
+    ## map these to collections
+    refined_projected_annotations = []
+
+    for td in destination_image_collection:
+        center_obj_template = td.center_obj_template
+
+        # TODO use something else to filter it later
+        source_image_template = [td for td in source_image_collection if td.center_obj_template.attributes.get("ID") == center_obj_template.attributes.get("ID")][0]
+
+        width = CacheConfig.patch_size
+        height = CacheConfig.patch_size
+        template_extent = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
+
+        ipf_refined = ImagePatchFinder(template_path=source_image_template.template_image_path,
+                                 template_polygon=template_extent,
+                                 large_image_path=td.template_image_path)
+
+        found_match = ipf_refined.find_patch(similarity_threshold=0.0005)
+
+        if found_match:
+            logger.info(f"Found template {source_image_template.template_image_path.stem} object is in the image {td.template_image_path.stem}")
+
+            ax_source = visualise_image(image_path=source_image_template.template_image_path, show=False, title="source annotations")
+            ax_source = visualise_polygons(polygons=[source_image_template.center_obj_template.bbox_polygon],
+                                          show=CacheConfig.show_visualisation, ax=ax_source,
+                                          labels=[source_image_template.center_obj_template.attributes.get("ID", "undefined")],
+                                          linewidth=4, color="red")
+
+            ax_image = visualise_image(image_path=td.template_image_path, show=False, title="projected annotations")
+            ax_image = visualise_polygons([ipf_refined.proj_template_polygon],
+                               show=False, ax=ax_image, color="white", linewidth=4.5)
+
+            # project the labels from the large image to the template, therefore using their ids
+            center_obj_template_proj_labels = project_bounding_box(source_image_template.center_obj_template, ipf_refined.M)
+
+            ax_image = visualise_polygons(polygons=[center_obj_template_proj_labels.bbox_polygon],
+                                          show=CacheConfig.show_visualisation, ax=ax_image,
+                                          labels=[center_obj_template_proj_labels.attributes.get("ID", "undefined")],
+                                          linewidth=4, color="red")
+
+            refined_projected_annotations.append(center_obj_template_proj_labels)
+
+
+    ## TODO how can I project these now back to the original image
+    refined_projected_annotations
 
 # TODO this should become some sort Class method
 def forward_template_matching_projection(

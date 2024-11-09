@@ -20,3 +20,5 @@ class CoveredObject:
     covered_templates: List[Image] = field(metadata={"description": "List of templates covered in the source image"})
     new_objects: List[ImageLabel] = field(metadata={"description": "List of new objects found in the source image"})
     template_extents: shapely.Polygon = field(metadata={"description": "The extent of the template in the source image"})
+
+
