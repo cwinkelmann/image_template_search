@@ -320,8 +320,11 @@ def get_similarity(template_image: Path,
     # TODO get the image_size
     with Image.open(template_image) as img:
         template_width, template_height = img.size
+
+    PIL.Image.MAX_IMAGE_PIXELS = 300000000
     with Image.open(image1) as img:
         img1_width, img1_height = img.size
+        img = img.convert("RGB")
 
     N_x = img1_width // template_width
     N_y = img1_height // template_height
@@ -482,6 +485,8 @@ class TiledExtractor:
     def extract(self, image_path, N_x, N_y):
         # Load the image
         image = Image.open(image_path)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
         image_np = np.array(image)  # Convert to NumPy array
         height, width, channels = image_np.shape
 

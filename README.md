@@ -31,3 +31,11 @@ t = l ... 5000 * 4000
 
 t ... 5000 * 4000
 l ... 50.000 * 50.000
+
+
+## Usage for the Orthomosaicing paper
+This template from: 
+
+There are 3 set of orthomosaics, with for mosaics each from metashape, pix4d, dronedeploy, opendronemap
+- ../IguanasFromAbove/Orthomosaics for quality analysis/<Mission_Name>/
+- 

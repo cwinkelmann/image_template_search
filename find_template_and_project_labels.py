@@ -4,17 +4,23 @@ workflow for andreas Method paper
 Find a drone image in an orthomosaic
 
 This entails matching the image to a potentially quite big geotiff/jpf
+
 """
+import PIL
+Image.MAX_IMAGE_PIXELS = 300000000
+PIL.Image.MAX_IMAGE_PIXELS = 400000000
+from PIL import Image as PILImage
+
+
 import copy
 import gc
 import typing
-from cProfile import label
 from pathlib import Path
 
 from loguru import logger
 from matplotlib import pyplot as plt
 from shapely.geometry.polygon import Polygon
-from PIL import Image as PILImage
+
 
 from conf.config_dataclass import CacheConfig
 from detection_deduplication import find_objects, find_objects_individual_all
@@ -27,8 +33,55 @@ from image_template_search.util.util import visualise_image, visualise_polygons,
 from tests.test_detection_deduplication import output_path
 
 
+def single_stage_template_matching_projection(template_image_path: Path, large_image_path: Path,
+                                            drone_image_labels: typing.List[ImageLabel] = None) -> typing.List[ImageLabel]:
+    """
+    project template annotations on the orthomosaic
+    :param template_image_path:
+    :param large_image_path:
+    :param drone_image_labels:
+    :return:
+    """
+    p_image = PILImage.open(
+        template_image_path)  # Replace with your image file path
+
+    source_image_width, source_image_height = p_image.size
+    template_extent = Polygon(
+        [(0, 0), (source_image_width, 0), (source_image_width, source_image_height), (0, source_image_height)])
+
+    ## find the rough location of the template drone image in the orthomosaic
+    ipf_t = ImagePatchFinder(template_path=template_image_path,
+                             template_polygon=template_extent,
+                             large_image_path=large_image_path)
+
+    found_match = ipf_t.find_patch(similarity_threshold=0.0005)
+
+    # Remove the shift by setting the translation components to zero
+    # ipf_t.M[0, 2] = 0  # Set horizontal translation to zero
+    # ipf_t.M[1, 2] = 0  # Set vertical translation to zero
+
+    if found_match:
+        logger.info(f"Found template {template_image_path.stem} object is in the image {large_image_path.stem}")
+
+    ax_image = visualise_image(image_path=large_image_path, show=False, title="Orthomosaic")
+    visualise_polygons([ipf_t.proj_template_polygon],
+                       labels=["template extent"],
+                       show=CacheConfig.visualise_info, ax=ax_image, color="red", linewidth=4.5)
+
+
+
+    # project the labels from the large image to the template, therefore using their ids
+    small_image_proj_labels = [project_bounding_box(l, ipf_t.M) for l in drone_image_labels]
+
+    # Image(image_name=large_image_path.stem,
+    #       height=source_image_height, width=source_image_width,
+    #       labels=small_image_proj_labels)
+
+    return small_image_proj_labels
+
+
 def drone_template_orthomosaic_localization(template_image_path: Path, large_image_path: Path,
-                                            drone_image_labels: typing.List[ImageLabel] = None):
+                                            drone_image_labels: typing.List[ImageLabel] = None) -> Image:
     # TODO extract this
     width = 5472
     height = 3648
@@ -336,18 +389,31 @@ def forward_template_matching_projection(
 
 
 if __name__ == "__main__":
+
+
+
     base_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
-    orthomosaic = base_path / "mosaics/mosaic_100.jpg"
     drone_image = base_path / "single_images/DJI_0066.JPG"
+    drone_image = base_path / "single_images/DJI_0066.JPG"
+
+    # FMO04
+    image_2 = base_path / "mosaics/mosaic_100.jpg"
+    image_2 = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/DD_FMO04_Orthomosaic_export_MonFeb12205040089714.tif")
+
+
+    ## The image for Andrea:
+    # image_2 =  Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/San_STJB01_10012023_orthomosaic_DDeploy.tif")
+    # image_2 = base_path / "single_images/DJI_0067.JPG"
+
     images_path = base_path
     output_path = base_path / "output"
 
     hA = hA_from_file(
-        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_28.json"))
+        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/all_labels_2024_11_07.json"))
     hA.images = [i for i in hA.images if i.image_name in [drone_image.name]]
-
     assert len(hA.images) == 1, "There should be only a single image left"
     drone_image_label = hA.images[0]
+
 
     # ## Re-Identify the objects form the source image in the other images
     # covered_objects = forward_template_matching_projection(
@@ -358,5 +424,26 @@ if __name__ == "__main__":
     #     dest_image_labels=None,
     #     patch_size=1280)
 
-    drone_template_orthomosaic_localization(drone_image, orthomosaic, drone_image_label.labels)
+    # # ========== Two stage projection ==========
+    # projected_labels = drone_template_orthomosaic_localization(template_image_path=drone_image,
+    #                                                            large_image_path=orthomosaic,
+    #                                                            drone_image_labels=drone_image_label.labels)
+
+
+    # ========== One stage projection ==========
+    projected_labels = single_stage_template_matching_projection(template_image_path=drone_image,
+                                                               large_image_path=image_2,
+                                                               drone_image_labels=drone_image_label.labels)
+
+    # hA_gt = hA_from_file(
+    #     file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/all_images_2024_11_10.json"))
+    # hA_gt.images = [i for i in hA_gt.images if i.image_name in [image_2.name]]
+    # labels_gt = hA_gt.images[0].labels
+    # assert len(hA_gt.images) == 1, "There should be only a single image left"
+    # gt_image_label = hA_gt.images[0]
+
     # debug_hasty_fiftyone(hA, images_path)
+    ax_p = visualise_image(image_path=image_2, show=False, title="projected labels")
+    ax_p = visualise_polygons(polygons=[x.bbox_polygon for x in projected_labels], ax=ax_p, linewidth=4, color="red", show=True)
+    # ax_p = visualise_polygons(polygons=[x.bbox_polygon for x in labels_gt], ax=ax_p, linewidth=4, color="blue",
+    #                           show=True)

@@ -268,7 +268,12 @@ def visualise_image(image_path: Path = None,
     if ax is None:
         fig, ax = plt.subplots(1, figsize=figsize, dpi=dpi)  # TODO use the shape of imr to get the right ration
     if image_path is not None:
+        PILImage.Image.MAX_IMAGE_PIXELS = 300000000
+
         image = PILImage.open(image_path)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
     imr = np.array(image, dtype=np.uint8)
     ax.imshow(imr)
     ax.set_title(title)
