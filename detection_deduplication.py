@@ -19,7 +19,7 @@ from shapely import Polygon
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box, project_annotations_to_crop
 from image_template_search.util.CoveredObjectType import CoveredObject
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, Image, ImageLabel, label_dist_edge_threshold, \
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, AnnotatedImage, ImageLabel, label_dist_edge_threshold, \
     HastyAnnotationV2, LabelClass
 from image_template_search.util.util import visualise_polygons, visualise_image, \
     crop_templates_from_image, create_box_around_point, calculate_nearest_border_distance, get_template_id, hash_objects
@@ -54,7 +54,7 @@ def persist_image_stacks(covered_objects: typing.List[CoveredObject], label_clas
 
     return stacked_annotations
 
-def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280, individual=False, edge=False) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
+def find_objects(image: AnnotatedImage | typing.List[ImageLabel], patch_size=1280, individual=False, edge=False) -> tuple[list[list[ImageLabel]], list[Polygon], list[ImageLabel], list[ImageLabel]]:
     """
     Find objects in the image and return them as a list of lists of ImageLabels and a list of polygons
 
@@ -65,7 +65,7 @@ def find_objects(image: Image | typing.List[ImageLabel], patch_size=1280, indivi
     :param patch_size:
     :return:
     """
-    if isinstance(image, Image):
+    if isinstance(image, AnnotatedImage):
         logger.warning(f"passing the Image is deprecated, please pass just the labels" )
         image_labels = image.labels
     else:
@@ -155,10 +155,10 @@ def cutout_detection_deduplication(source_image_path: Path,
                                    template_image_path: Path,
                                    cutout_polygon: Polygon,
                                    template_labels: list[ImageLabel],
-                                   other_images: list[Image],
+                                   other_images: list[AnnotatedImage],
                                    images_path: Path,
                                    output_path: Path,
-                                   ) -> list[Image]:
+                                   ) -> list[AnnotatedImage]:
     """
     Cutout the detection from the image
 
@@ -265,9 +265,9 @@ def cutout_detection_deduplication(source_image_path: Path,
 
                         plt.close(ax_c.figure)
 
-                    i = Image(image_name=warped_path.name,
-                              height=frame_height, width=frame_width,
-                              labels=large_image_labels_containing)
+                    i = AnnotatedImage(image_name=warped_path.name,
+                                       height=frame_height, width=frame_width,
+                                       labels=large_image_labels_containing)
 
                     covered_objects.append(i)
                     gc.collect()
@@ -285,8 +285,8 @@ def cutout_detection_deduplication(source_image_path: Path,
 
 
 def find_annotated_template_matches(images_path: Path,
-                                    source_image: Image,
-                                    other_images: list[Image],
+                                    source_image: AnnotatedImage,
+                                    other_images: list[AnnotatedImage],
                                     output_path: Path,
                                     patch_size = 1280) -> list[CoveredObject]:
     """
@@ -359,9 +359,9 @@ def find_annotated_template_matches(images_path: Path,
         template_image_path = output_path / f"template_source_{template_id}.jpg"
         t.save(template_image_path)  # save the template
 
-        template_image_ann = Image(image_name=template_image_path.name,
-                                   height=t.height, width=t.width,
-                                   labels=objs_in_template[i])
+        template_image_ann = AnnotatedImage(image_name=template_image_path.name,
+                                            height=t.height, width=t.width,
+                                            labels=objs_in_template[i])
         if CacheConfig.visualise_info:
             ax_q = visualise_image(image=t, show=False,
                                    title=f"New Objects_{source_image.image_name} template:{i} with annotations:{len(objs_in_template[i])}")

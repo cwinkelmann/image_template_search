@@ -100,7 +100,7 @@ class ImageLabel(BaseModel):
     def __hash__(self):
         return self.id
 
-class Image(BaseModel):
+class AnnotatedImage(BaseModel):
     image_id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='image_id')
     image_name: str = Field(alias='image_name', description="Name of the image file")
     dataset_name: Optional[str] = Field(default=None, alias='dataset_name')
@@ -120,7 +120,7 @@ class HastyAnnotationV2(BaseModel):
     export_format_version: str = Field(alias='export_format_version', default="1.1")
     export_date: datetime = Field(default=datetime.now())
     label_classes: List[LabelClass]
-    images: List[Image]
+    images: List[AnnotatedImage]
 
     def save(self, file_path: Path):
         with open(file_path, 'w') as json_file:

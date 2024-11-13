@@ -7,10 +7,9 @@ This entails matching the image to a potentially quite big geotiff/jpf
 
 """
 import PIL
-Image.MAX_IMAGE_PIXELS = 300000000
-PIL.Image.MAX_IMAGE_PIXELS = 400000000
-from PIL import Image as PILImage
 
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 400000000
 
 import copy
 import gc
@@ -26,7 +25,7 @@ from conf.config_dataclass import CacheConfig
 from detection_deduplication import find_objects, find_objects_individual_all
 from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box
 from image_template_search.util.CoveredObjectType import CoveredObject
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, Image
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, AnnotatedImage
 from image_template_search.util.TemplateDataType import TemplateData
 from image_template_search.util.util import visualise_image, visualise_polygons, calculate_nearest_border_distance, \
     crop_templates_from_image, crop_image_bounds, hash_objects, get_template_id
@@ -42,7 +41,7 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
     :param drone_image_labels:
     :return:
     """
-    p_image = PILImage.open(
+    p_image = Image.open(
         template_image_path)  # Replace with your image file path
 
     source_image_width, source_image_height = p_image.size
@@ -63,7 +62,7 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
     if found_match:
         logger.info(f"Found template {template_image_path.stem} object is in the image {large_image_path.stem}")
 
-    ax_image = visualise_image(image_path=large_image_path, show=False, title="Orthomosaic")
+    ax_image = visualise_image(image_path=large_image_path, show=False, title="Orthomosaic", dpi=75)
     visualise_polygons([ipf_t.proj_template_polygon],
                        labels=["template extent"],
                        show=CacheConfig.visualise_info, ax=ax_image, color="red", linewidth=4.5)
@@ -81,7 +80,7 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
 
 
 def drone_template_orthomosaic_localization(template_image_path: Path, large_image_path: Path,
-                                            drone_image_labels: typing.List[ImageLabel] = None) -> Image:
+                                            drone_image_labels: typing.List[ImageLabel] = None) -> AnnotatedImage:
     # TODO extract this
     width = 5472
     height = 3648
@@ -94,7 +93,7 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
                                                                                               image_width=width,
                                                                                               image_height=height)
 
-    p_image = PILImage.open(
+    p_image = Image.open(
         template_image_path)  # Replace with your image file path
 
     templates = crop_templates_from_image(image=p_image,
@@ -156,7 +155,7 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
         template_annotations, template_extents, cropped_annotations = find_objects_individual_all(small_image_proj_labels,
                                                                                             patch_size=CacheConfig.patch_size + CacheConfig.patch_size_offset)
 
-        p_image = PILImage.open(
+        p_image = Image.open(
             large_image_path)  # Replace with your image file path
 
         templates = crop_templates_from_image(image=p_image,
@@ -239,12 +238,12 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
 # TODO this should become some sort Class method
 def forward_template_matching_projection(
         source_image_path: Path,
-        source_image_label: Image,
+        source_image_label: AnnotatedImage,
         dest_image_path: Path,
         output_path: Path,
-        dest_image_labels: Image = None,
+        dest_image_labels: AnnotatedImage = None,
         patch_size=1280
-) -> list[Image]:
+) -> list[AnnotatedImage]:
     """
     match the source image to the destination image
 
@@ -263,11 +262,11 @@ def forward_template_matching_projection(
     logger.info(f"Looking for these objects in {[l.attributes.get('ID', None) for l in source_image_labels]} images")
     logger.info(f"finding template patch {source_image_path.stem} in {source_image_path.stem}")
 
-    with PILImage.open(source_image_path) as img:
+    with Image.open(source_image_path) as img:
         source_image_width, source_image_height = img.size
         source_image_extent = Polygon([(0, 0), (source_image_width, 0), (source_image_width, source_image_height), (0, source_image_height)])
 
-    with PILImage.open(dest_image_path) as img:
+    with Image.open(dest_image_path) as img:
         dest_frame_width, dest_image_height = img.size
         dest_image_extent = Polygon([(0, 0), (dest_frame_width, 0), (dest_frame_width, dest_image_height), (0, dest_image_height)])
 
@@ -322,7 +321,7 @@ def forward_template_matching_projection(
         objs_in_templates, template_extents, covered_labels, uncovered_labels = find_objects(source_image_label,
                                                                                             patch_size=patch_size)
 
-        p_image = PILImage.open(
+        p_image = Image.open(
             images_path / source_image_label.dataset_name / source_image_label.image_name)  # Replace with your image file path
 
         templates = crop_templates_from_image(image=p_image,
@@ -389,8 +388,8 @@ def forward_template_matching_projection(
 
 
 if __name__ == "__main__":
-
-
+    # annotations_file_path = Path(
+    #     "/Users/christian/data/2TB/ai-core/data/detection_deduplication/all_images_2024_11_10.json")
 
     base_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
     drone_image = base_path / "single_images/DJI_0066.JPG"
@@ -399,17 +398,21 @@ if __name__ == "__main__":
     # FMO04
     image_2 = base_path / "mosaics/mosaic_100.jpg"
     image_2 = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/DD_FMO04_Orthomosaic_export_MonFeb12205040089714.tif")
+    image_2 = Path("/Volumes/2TB/Download_2024_11_12/FMO04_Orthomosaic_MonFeb12205040089714/FMO04_Orthomosaic_export_MonFeb12205040089714.tif")
 
 
     ## The image for Andrea:
-    # image_2 =  Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/San_STJB01_10012023_orthomosaic_DDeploy.tif")
+    base_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
+    drone_image = base_path / "San_STJB01_10012023/template_images/San_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"
+    image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_DDeploy.tif"
+
+    annotations_file_path = base_path / "San_STJB01_10012023/template_images/methods_paper_labels.json"
     # image_2 = base_path / "single_images/DJI_0067.JPG"
 
     images_path = base_path
     output_path = base_path / "output"
 
-    hA = hA_from_file(
-        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/all_labels_2024_11_07.json"))
+    hA = hA_from_file(file_path=annotations_file_path)
     hA.images = [i for i in hA.images if i.image_name in [drone_image.name]]
     assert len(hA.images) == 1, "There should be only a single image left"
     drone_image_label = hA.images[0]
@@ -443,7 +446,7 @@ if __name__ == "__main__":
     # gt_image_label = hA_gt.images[0]
 
     # debug_hasty_fiftyone(hA, images_path)
-    ax_p = visualise_image(image_path=image_2, show=False, title="projected labels")
+    ax_p = visualise_image(image_path=image_2, show=False, title="projected labels", dpi=75)
     ax_p = visualise_polygons(polygons=[x.bbox_polygon for x in projected_labels], ax=ax_p, linewidth=4, color="red", show=True)
     # ax_p = visualise_polygons(polygons=[x.bbox_polygon for x in labels_gt], ax=ax_p, linewidth=4, color="blue",
     #                           show=True)

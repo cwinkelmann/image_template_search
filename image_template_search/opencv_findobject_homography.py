@@ -5,19 +5,211 @@ find a template image in a larger image.
 Doesn't work for big images.
 rotated or perspective transformed images should work, i.e. cliff flights.
 """
+import gc
 import pickle
 
 import cv2
+from PIL import Image
 from loguru import logger
 from pathlib import Path
 
 import numpy as np
 import cv2 as cv
 from matplotlib import pyplot as plt, patches
+from shapely.geometry.polygon import Polygon
 
 from image_template_search.util.util import get_image_id
 
 MIN_MATCH_COUNT = 10
+
+def tile_large_image(x, y, tile_size_x, tile_size_y,
+                     overlap_x, overlap_y,
+                     large_image, template_path, tile_base_path, prefix):
+    """
+    Wrapper function to extract the tile and call match_template.
+    Adjusts match coordinates for their position in the original image.
+    """
+
+    # tile creation
+    tile = large_image[y:y+tile_size_y, x:x+tile_size_x]
+    tile_path = tile_base_path / f"{prefix}_tile_{x}_{y}.jpg"
+    a = cv2.imwrite(str(tile_path), tile)
+
+    return tile_path
+
+def tile_opencv_findobject_homography(template_path: Path, large_image_path: Path, tile_base_path: Path,
+                                      cache_path: Path, output_path: Path):
+    """
+
+    :param template_path:
+    :param large_image_path:
+    :param tile_base_path:
+    :param cache_path:
+    :param output_path:
+    :return:
+    """
+
+
+    tile_base_path.mkdir(exist_ok=True, parents=True)
+    cache_path.mkdir(exist_ok=True, parents=True)
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    fx = 1
+    fy = 1
+    # keep 70% of the keypoints and descriptors
+    keepers = 100
+
+    large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
+    large_image = cv2.resize(large_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+    MIN_MATCH_COUNT = 10
+    # SIFT Based Feature Extractor
+    detector = cv2.SIFT_create()
+    # detector = cv2.BRISK_create()
+    norm = cv2.NORM_HAMMING
+
+    tile_size_x = 3000
+    tile_size_y = 3000
+    overlap_x = 0
+    overlap_y = 0
+    pad_size = 0
+
+    kp2s = []
+    des2s = []
+
+    img1 = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
+    img1 = cv2.resize(img1, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+    kp1, des1 = _cached_detect_and_compute(detector, img1, template_path, cache_path=cache_path)
+
+    assert des1.shape == (len(kp1), 128), "Descriptors have the wrong shape"
+    # process the bigger image by tiling it tiled big image
+    for y in range(0, large_image.shape[0], tile_size_y - overlap_y):
+        for x in range(0, large_image.shape[1], tile_size_x - overlap_x):
+            print(f"Tiling image into smaller parts: {x}, {y}")
+            try:
+                tile_path = tile_large_image(x, y, tile_size_x, tile_size_y, overlap_x, overlap_y, large_image,
+                                             template_path, tile_base_path, prefix=tile_base_path.name)
+
+                # detector = cv.BRISK_create(thresh=70, octaves=0, patternScale=1.0)
+
+                logger.info(f"detector.detectAndCompute")
+
+                img2 = cv2.imread(str(tile_path), cv2.IMREAD_GRAYSCALE)  # train
+
+                kp2, des2 = _cached_detect_and_compute(detector, img2, tile_path, cache_path=cache_path)
+
+                # we need to modify the points to match the original image
+                kp_list = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in
+                           kp2]
+
+                kp2 = [cv2.KeyPoint(x=pt[0] + x, y=pt[1] + y, size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
+                                    class_id=pt[6]) for pt in kp_list]
+
+                # the keypoints and descriptors are stored in a list
+                if len(kp2) > 0:
+                    kp2s.append(kp2)
+                if des2 is not None:
+                    des2s.append(des2)
+                logger.info(f"Found {len(kp2)} keypoints in img2 {tile_path.name}")
+
+
+
+            except RuntimeError as e:
+                logger.error(f"error processing tile: {x}, {y}, {e}")
+
+        del (large_image)
+
+        # assemble all keypoints and descriptors from the tiles
+        kp2 = [item for sublist in kp2s for item in sublist]
+        # des2 = [item for sublist in des2s for item in sublist]
+
+        des2 = np.concat(des2s)
+        del (des2s)
+        del (kp2s)
+        gc.collect()
+
+        return kp1, des1, kp2, des2
+
+
+def opencv_flann_matching(des1, des2, kp1, kp2, query_img_path, img2_path, cache_path: Path = None):
+    img1 = cv2.imread(str(query_img_path), cv2.IMREAD_GRAYSCALE)
+    img2 = cv2.imread(str(img2_path), cv2.IMREAD_GRAYSCALE)
+
+    if len(kp1) > 10 and len(kp2) > 10:
+        ## BRISK
+        # FLANN_INDEX_KDTREE = 1
+        # index_params = dict(algorithm = 6,
+        #                                table_number = 6, # 12
+        #                                key_size = 12,     # 20
+        #                                multi_probe_level = 1)
+        # # search_params = dict(checks=50)
+        # flann = cv.FlannBasedMatcher(index_params, {})
+
+        ## SIFT
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)
+        flann = cv.FlannBasedMatcher(index_params, search_params)
+        # matches = flann.knnMatch(des1, des2, k=2)
+
+        logger.info(f"flann.knnMatch")
+        matches = _cached_matcher(flann, des1, des2, query_img_path, img2_path, k=2, cache_path=cache_path)
+        # matches = flann.knnMatch(des1, des2, k=2)
+    else:
+        logger.error("Not enough keypoints found to be matched")
+        matches = []
+
+
+    # store all the good matches as per Lowe's ratio test.
+    good = []
+    try:
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good.append(m)
+    except Exception as e:
+        logger.error("Not enough matches are found - {}".format(len(matches)))
+        matchesMask = None
+        M = None
+        new_image_footprint = None
+
+
+    if len(good) > MIN_MATCH_COUNT:
+        src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+        logger.info(f"cv.findHomography")
+        M, mask = cv.findHomography(src_pts, dst_pts, cv.RANSAC, 5.0)
+        matchesMask = mask.ravel().tolist()
+
+        ## we take the shape of the first image which was transformed
+        ## then we create a box around the transformed image and project it new image
+        h, w = img1.shape
+        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2) # This is the box of the query image
+        logger.info(f"cv.perspectiveTransform")
+        dst = cv.perspectiveTransform(pts, M)
+        new_image_footprint = dst
+        # draw the matches outer box
+        img2 = cv.polylines(img2, [np.int32(dst)], True, 255, 3, cv.LINE_AA)
+
+        new_image_footprint = np.int32(dst.reshape(4, 2))
+
+    else:
+        print("Not enough good matches are found - {}/{}".format(len(good), MIN_MATCH_COUNT))
+        matchesMask = None
+        M = None
+        new_image_footprint = None
+
+    draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
+                       singlePointColor=None,
+                       matchesMask=matchesMask,  # draw only inliers
+                       flags=2)
+
+    # img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, **draw_params)
+
+    plt.imshow(img2, 'gray')
+    plt.show()
+    plt.close()
+
+    return M, matchesMask, new_image_footprint
+
 
 
 def transform_points(M, point):
@@ -116,9 +308,10 @@ def _cached_matcher(flann, des1, des2, img_1_path: Path, img_2_path: Path,
     else:
         logger.info(f"Computing matches for {img_1_path.name} and {img_2_path.name}")
         matches = flann.knnMatch(des1, des2, k=2)
-        matches_picklable = [[(m.queryIdx, m.trainIdx, m.imgIdx, m.distance) for m in match_list] for match_list in matches]
 
         if cache_path is not None:
+            matches_picklable = [[(m.queryIdx, m.trainIdx, m.imgIdx, m.distance) for m in match_list] for match_list in
+                                 matches]
             with open(matches_cache_path, 'wb') as f:
                 pickle.dump(matches_picklable, f)
         logger.info(f"Matches computed for {img_1_path.name} and {img_2_path.name}")
@@ -225,8 +418,8 @@ def find_rotation(img1_path: Path, img2_path: Path, cache_path):
 
     # img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, **draw_params)
 
-    #plt.imshow(img2, 'gray')
-    #plt.show()
+    plt.imshow(img2, 'gray')
+    plt.show()
     plt.close()
 
     return M, matchesMask, new_image_footprint
@@ -360,51 +553,37 @@ if __name__ == "__main__":
     base_path = "/Users/christian/data/2TB/ai-core/data/demo_FMO04_BDII/demo_FMO04_subset/output/clipped_fp_25_4"
     fig, ax = plt.subplots(1, figsize=(5, 5))
 
-    img1 = base_path / Path('0001.JPG')
-    img2 = base_path / Path('0002.JPG')
-    min_x = 598
-    min_y = 584
-    point1 = np.array([min_x, min_y, 1])
-    max_x = 682
-    max_y = 696
-    point2 = np.array([max_x, max_y, 1])
-    w = max_x - min_x
-    h = max_y - min_y
-    # Plot the bounding box
+    base_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
+    drone_image = base_path / "San_STJB01_10012023/template_images/San_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"
+    image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_DDeploy.tif"
+    interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
 
 
-    rect = patches.Rectangle((min_x, min_y), width=w, height=h, edgecolor='r', facecolor="none")
-    large_image = cv2.imread(str(img1), cv2.IMREAD_COLOR)
+    #M, mask, new_image_footprint = find_rotation(img1, img2)
 
-    ax.imshow(large_image)
+    tile_base_path = interm_path / "tiles"
+    cache_path = interm_path / "cache"
+    output_path = interm_path / "output"
 
-    ax.add_patch(rect)
-    plt.show()
+    p_image = Image.open(
+        drone_image)  # Replace with your image file path
 
+    source_image_width, source_image_height = p_image.size
+    template_extent = Polygon(
+        [(0, 0), (source_image_width, 0), (source_image_width, source_image_height), (0, source_image_height)])
 
+    # TODO this is duplicate code
+    kp1, des1, kp2, des2 = tile_opencv_findobject_homography(template_path=drone_image, large_image_path=image_2,
+                                                                     tile_base_path=tile_base_path, cache_path=cache_path, output_path=output_path)
 
+    M, matchesMask, new_image_footprint = opencv_flann_matching(des1, des2, kp1, kp2, query_img_path=drone_image, img2_path=image_2, cache_path=cache_path)
 
-    M, mask, new_image_footprint = find_rotation(img1, img2)
+    M_ = np.linalg.inv(M)
 
-    #print(f"Transformation Matrix: \n{np.round(M, 2)}")
-    #print(f"Mask: {set(mask)}")
-    point1_hat = transform_points(M, point1)
-    point2_hat = transform_points(M, point2)
-    w = abs(point2_hat[0] - point1_hat[0])
-    h = abs(point2_hat[1] - point1_hat[1])
-
-    # transform the footprint of the original image to the new image
-
-    fig, ax = plt.subplots(1, figsize=(5, 5))
-
-    rect_1 = patches.Rectangle(point1, width=w, height=h, edgecolor='y', facecolor="none")
-    rect_2 = patches.Rectangle(point1_hat, width=w, height=h, edgecolor='green', facecolor="none")
-    large_image = cv2.imread(str(img2), cv2.IMREAD_COLOR)
-
-    ax.imshow(large_image)
-
-
-    # Plot the bounding box again
-    ax.add_patch(rect_1)
-    ax.add_patch(rect_2)
-    plt.show()
+    # TODO fix the circular import
+    # proj_template_polygon = project_bounding_box(template_extent, M)
+    #
+    # ax_image = visualise_image(image_path=image_2, show=False, title="Orthomosaic", dpi=45)
+    # visualise_polygons([proj_template_polygon],
+    #                    labels=["template extent"],
+    #                    show=True, ax=ax_image, color="red", linewidth=4.5)

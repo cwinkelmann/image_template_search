@@ -1,6 +1,7 @@
 import typing
 import shapely
 import numpy as np
+from PIL import Image
 from loguru import logger
 from matplotlib import pyplot as plt
 import matplotlib.axis as axis
@@ -397,3 +398,14 @@ def crop_templates_from_image(image: typing.Union[PILImage, np.ndarray], bbox_po
         cropped_images.append(cropped_image)
 
     return cropped_images
+
+
+def get_image_dimensions(image_path) -> typing.Tuple[int, int]:
+    """
+    Get the dimensions of an image file.
+    :param image_path:
+    :return:
+    """
+    with Image.open(image_path) as img:
+        width, height = img.size
+    return width, height

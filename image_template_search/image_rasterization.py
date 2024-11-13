@@ -3,6 +3,7 @@ from typing import List
 import PIL.Image
 import cv2
 import shapely
+from loguru import logger
 from shapely import Polygon
 
 
@@ -138,6 +139,14 @@ def tile_large_image(x, y, tile_size_x, tile_size_y,
     # tile creation
     tile = large_image[y:y+tile_size_y, x:x+tile_size_x]
     tile_path = tile_base_path / f"{prefix}_tile_{x}_{y}.jpg"
-    a = cv2.imwrite(str(tile_path), tile)
 
+    if tile_path.exists():
+        return tile_path
+
+    tile = PIL.Image.fromarray(tile)
+    # a = cv2.imwrite(str(tile_path), tile)
+    if tile.mode != "RGB":
+        tile = tile.convert("RGB")
+    tile.save(tile_path)
+    logger.info(f"Tile saved to {tile_path}")
     return tile_path
