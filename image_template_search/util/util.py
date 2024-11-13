@@ -1,4 +1,6 @@
 import typing
+from datetime import datetime
+
 import shapely
 import numpy as np
 from PIL import Image
@@ -21,6 +23,7 @@ from joblib import Memory
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
+from image_template_search.util.georeferenced_image import ExifMetaData, XMPMetaData, ExtendImageMetaData
 
 
 def feature_extractor_cache():
@@ -163,15 +166,18 @@ def get_image_id(filename: Path = None, image: np.ndarray = None):
     @param filename:
     @return:
     """
+    assert (filename is not None) != (image is not None), "Either filename or image must be provided"
 
     if filename is not None:
         with open(filename, "rb") as f:
             bytes = f.read()  # read entire file as bytes
             readable_hash = hashlib.sha256(bytes).hexdigest()
+
         return readable_hash
     if image is not None:
         image_bytes = image.tobytes()
         readable_hash = hashlib.sha256(image_bytes).hexdigest()
+
         return readable_hash
 
 
@@ -269,7 +275,7 @@ def visualise_image(image_path: Path = None,
     if ax is None:
         fig, ax = plt.subplots(1, figsize=figsize, dpi=dpi)  # TODO use the shape of imr to get the right ration
     if image_path is not None:
-        PILImage.Image.MAX_IMAGE_PIXELS = 300000000
+        PILImage.Image.MAX_IMAGE_PIXELS = 5223651122
 
         image = PILImage.open(image_path)
         if image.mode != 'RGB':
@@ -409,3 +415,121 @@ def get_image_dimensions(image_path) -> typing.Tuple[int, int]:
     with Image.open(image_path) as img:
         width, height = img.size
     return width, height
+
+
+def decimal_coords(coords, ref):
+    """
+    calculate the decimal degrees
+    :param coords:
+    :param ref:
+    :return:
+    """
+    decimal_degrees = coords[0] + coords[1] / 60 + coords[2] / 3600
+    if ref == "S" or ref == "W":
+        decimal_degrees = -decimal_degrees
+    return decimal_degrees
+
+def get_exif_metadata(img_path: Path) -> ExtendImageMetaData:
+    """
+    load gps coordinates from the image
+
+    https://medium.com/spatial-data-science/how-to-extract-gps-coordinates-from-images-in-python-e66e542af354
+
+    :param img_path:
+    :return:
+    """
+    from exif import Image as ExifImage
+
+    with open(img_path, 'rb') as src:
+        img = ExifImage(src)
+        image_id = get_image_id(img_path)
+
+    if img.has_exif:
+        try:
+            latitude = decimal_coords(img.gps_latitude, img.gps_latitude_ref)
+            longitude = decimal_coords(img.gps_longitude, img.gps_longitude_ref)
+
+            # print(f"Image {src.name}, OS Version:{img.get('software', 'Not Known')} ------")
+            # print(f"Was taken: {img.datetime_original}, and has coordinates:{coords}")
+            metadata = {"image_id": image_id,
+                        "image_name": img_path.name,
+                        "latitude": latitude, "longitude": longitude,
+                        "datetime_original": img.datetime_original,
+
+                        "filepath": str(img_path)}
+
+            supposedly_available_keys = ['image_width', 'image_height', 'bits_per_sample', 'image_description',
+                                         'make', 'model', 'orientation',
+                                         'samples_per_pixel', 'x_resolution', 'y_resolution', 'resolution_unit',
+                                         'software', 'datetime',
+                                         'y_and_c_positioning', '_exif_ifd_pointer', '_gps_ifd_pointer',
+                                         'xp_keywords', 'compression',
+                                         'jpeg_interchange_format', 'jpeg_interchange_format_length',
+                                         'exposure_time', 'f_number',
+                                         'exposure_program', 'photographic_sensitivity', 'exif_version',
+                                         'datetime_original',
+                                         'datetime_digitized', 'exposure_bias_value', 'max_aperture_value',
+                                         'metering_mode', 'light_source',
+                                         'focal_length', 'color_space', 'pixel_x_dimension',
+                                         'pixel_y_dimension', 'exposure_mode',
+                                         'white_balance', 'digital_zoom_ratio', 'focal_length_in_35mm_film',
+                                         'scene_capture_type',
+                                         'gain_control', 'contrast', 'saturation', 'sharpness',
+                                         'body_serial_number', 'lens_specification',
+                                         'gps_version_id', 'gps_latitude_ref', 'gps_latitude',
+                                         'gps_longitude_ref', 'gps_longitude',
+                                         'gps_altitude_ref', 'gps_altitude']
+
+            # raw_exif = img.get_all()
+            for key in supposedly_available_keys:
+                metadata[key] = img.get(key)
+
+            metadata["datetime_digitized"] = str(
+                datetime.strptime(metadata["datetime_digitized"], "%Y:%m:%d %H:%M:%S"))
+
+            exif_meta_data = ExtendImageMetaData(**metadata)
+
+        except AttributeError:
+            print('No Coordinates')
+            image_metadata = {}
+            return {}
+
+    else:
+        logger.warning(f"The Image {src} has no EXIF information")
+
+    # exif_meta_data = ExifMetaData(**metadata)
+    return exif_meta_data
+
+
+def get_xmp_metadata(img_path: Path)->XMPMetaData:
+    from libxmp import XMPFiles, consts
+
+    metadata = {}
+
+    try:
+        xmpfile = XMPFiles(file_path=str(img_path), open_forupdate=True)
+        xmp = xmpfile.get_xmp()
+        metadata["format"] = xmp.get_property(consts.XMP_NS_DC, 'format')
+
+        for xmp_key in [
+            "drone-dji:GpsLatitude", "drone-dji:GpsLongitude",
+            "drone-dji:GimbalYawDegree", "drone-dji:GimbalRollDegree",
+            "drone-dji:GimbalPitchDegree",  # the pitch is the inclination with -90 == NADIR and 0 is horizontal
+            "drone-dji:AbsoluteAltitude", "drone-dji:RelativeAltitude",
+            "drone-dji:FlightRollDegree", "drone-dji:FlightYawDegree", "drone-dji:FlightPitchDegree"
+        ]:
+            try:
+                metadata[xmp_key] = float(xmp.get_property("http://www.dji.com/drone-dji/1.0/", xmp_key))
+            except Exception as e:
+                ## with phantom 4, someone wrote the metadata tag wrong: 'drone-dji:GpsLongitude' instead of 'drone-dji:GPSLongitude'
+                logger.error(f"Problem with {xmp_key}, {e}")
+
+    except Exception as e:
+        logger.error(
+            f"Problems with XMP library. Check https://python-xmp-toolkit.readthedocs.io/en/latest/installation.html and propably https://stackoverflow.com/questions/68869984/error-installing-exempi-2-5-2-on-m1-macbook-pro-running-big-sur")
+        logger.error(f"Modify exempi.py f path is None: \
+                        m1_path = '/opt/homebrew/lib/libexempi.dylib' \
+                        if os.path.exists(m1_path): \
+                            path = m1_path")
+        logger.error(e)
+    return metadata

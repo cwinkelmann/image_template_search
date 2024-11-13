@@ -6,5 +6,8 @@ pandas==2.2.3
 pytest==8.3.3
 fiftyone==1.0.1
 torch==2.5.1
-
+exif==1.6.0
+rasterio==1.4.2
+pyproj==3.7.0
+jupyter==1.1.1
 #  pip install fiftyone pandas pydantic joblib shapely loguru pytest

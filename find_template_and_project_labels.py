@@ -9,7 +9,7 @@ This entails matching the image to a potentially quite big geotiff/jpf
 import PIL
 
 from PIL import Image
-Image.MAX_IMAGE_PIXELS = 400000000
+Image.MAX_IMAGE_PIXELS = 5223651122
 
 import copy
 import gc

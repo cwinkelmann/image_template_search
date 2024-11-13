@@ -9,8 +9,7 @@ find template images in larger image sets. This allows for the following workflo
 ```bash
 conda create -n image-template-search python=3.11
 ```
-
-TODO: install LightGlue first
+install LightGlue first
 
 ```bash
 git clone --quiet https://github.com/cvg/LightGlue/
@@ -19,6 +18,10 @@ pip install --progress-bar off --quiet -e .
 pip install -e .
 ```
 
+Then install the requirements
+```bash
+pip install -r requirements.txt
+```
 
 ## Workflow
 find a small template image t in a larger image l

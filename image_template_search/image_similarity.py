@@ -4,13 +4,13 @@
 import copy
 import gc
 import math
-import pickle
 import random
 import typing
 from pathlib import Path
 from typing import Tuple
 
 import PIL.Image
+import cv2
 import kornia as K
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,116 +19,18 @@ import torch
 from PIL import Image
 from loguru import logger
 from shapely.affinity import affine_transform
+from shapely.geometry import Polygon
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_rasterization import tile_large_image
-from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _cached_matcher, \
-    persist_descriptors, persist_keypoints
-
-
+from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
-from image_template_search.util.util import get_image_id, get_similarity_cache_to_disk, get_image_dimensions
+from image_template_search.util.util import get_similarity_cache_to_disk, get_image_dimensions
 # Import your existing functions and classes
 from lightglue import LightGlue
 from lightglue import SIFT
 from lightglue import viz2d
 from lightglue.utils import load_image, rbd, Extractor
-import cv2
-import numpy as np
-from shapely.geometry import Polygon
-
-def _cached_tiled_keypoints_and_descriptors_extraction(detector,
-                                                       large_image: np.ndarray,
-                                                       tile_size_x, tile_size_y,
-                                                       overlap_x, overlap_y,
-                                                       tile_base_path, cache_path):
-    """
-    Extract keypoints and descriptors from a large image by tiling it
-    :param detector:
-    :param large_image:
-    :param tile_size_x:
-    :param tile_size_y:
-    :param overlap_x:
-    :param overlap_y:
-    :param tile_base_path:
-    :param cache_path:
-    :return:
-    """
-
-    # if cache_path is not None:
-    #     logger.warning("SOMEHOW the caching breaks the code")
-    #     img_id = get_image_id(image=large_image)
-    #     keypooints_cache_path = cache_path / f"{img_id}_keypoints.pkl"
-    #     descriptors_cache_path = cache_path / f"{img_id}_descriptors.pkl"
-
-    # if cache_path is not None and keypooints_cache_path.exists() and descriptors_cache_path.exists():
-    #     # TODO write a function for this
-    #     with open(keypooints_cache_path, 'rb') as f:
-    #         kp2 = pickle.load(f)
-    #         kp2 = [cv2.KeyPoint(x=pt[0], y=pt[1], size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
-    #                             class_id=pt[6]) for pt in kp2]
-    #     with open(descriptors_cache_path, 'rb') as f:
-    #         des2 = pickle.load(f)
-    if False:
-        pass
-    else:
-
-        kp2s = []
-        des2s = []
-        tiles = []
-
-        ## TODO get the caching right in here becuase this is terribly slow
-        for y in range(0, large_image.shape[0], tile_size_y - overlap_y):
-            for x in range(0, large_image.shape[1], tile_size_x - overlap_x):
-                try:
-                    tile_path = tile_large_image(x, y, tile_size_x, tile_size_y,
-                                                 large_image,
-                                                 tile_base_path,
-                                                 prefix=tile_base_path.name)
-                    tiles.append((tile_path, x, y))
-                except RuntimeError as e:
-                    logger.error(f"error processing tile: {x}, {y}, {e}")
-
-        del large_image
-
-        for tile_path, x, y in tiles:
-
-            img2 = cv2.imread(str(tile_path), cv2.IMREAD_GRAYSCALE)
-
-            kp2, des2 = _cached_detect_and_compute(detector, img=img2,
-                                                   img_path=tile_path, cache_path=cache_path)
-
-            # we need to modify the points to match the original image
-            kp_list = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in
-                       kp2]
-
-            # add the global coordinates offset to the keypoints location
-            kp2 = [cv2.KeyPoint(x=pt[0] + x, y=pt[1] + y, size=pt[2], angle=pt[3], response=pt[4], octave=pt[5],
-                                class_id=pt[6]) for pt in kp_list]
-            logger.info(f"Found {len(kp2)} keypoints in tile x:{x} y:{y}")
-            # the keypoints and descriptors are stored in a list
-            if len(kp2) > 0:
-                kp2s.append(kp2)
-            if des2 is not None:
-                des2s.append(des2)
-            gc.collect()
-
-
-
-
-        # assemble all keypoints and descriptors from the tiles
-        kp2 = [item for sublist in kp2s for item in sublist]
-        des2 = [item for sublist in des2s for item in sublist]
-
-        del (des2s)
-        del (kp2s)
-        gc.collect()
-
-        # if cache_path is not None:
-        #     persist_descriptors(des=des2, descriptors_cache_path=descriptors_cache_path)
-        #     persist_keypoints(kp=kp2, keypooints_cache_path=keypooints_cache_path)
-
-    return kp2, des2
 
 
 
@@ -147,7 +49,7 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
              and matched keypoints in the frame image.
     """
     image_template_T = load_image(template_image)  # Shape: (C, H, W)
-    image1_T = load_image(image1)          # Shape: (C, H, W)
+    image1_T = load_image(image1)  # Shape: (C, H, W)
 
     img_norm = image1_T / 255.0 if image1_T.max() > 1 else image1_T
     black_pixels = torch.all(img_norm < 0.1, dim=0).sum()
@@ -207,27 +109,28 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
                 # Append adjusted keypoints and descriptors
                 all_kpts1.append(kpts_tile)
                 all_descs1.append(feats_tile["descriptors"][0])  # Remove batch dimension
-                all_scores1.append(feats_tile["keypoint_scores"][0])      # Remove batch dimension
-                all_scales1.append(feats_tile["scales"][0])      # Remove batch dimension
-                all_oris1.append(feats_tile["oris"][0])      # Remove batch dimension
+                all_scores1.append(feats_tile["keypoint_scores"][0])  # Remove batch dimension
+                all_scales1.append(feats_tile["scales"][0])  # Remove batch dimension
+                all_oris1.append(feats_tile["oris"][0])  # Remove batch dimension
 
         if not all_kpts1:
             logger.warning("No keypoints found in any tile of the frame.")
             return 0, torch.tensor([]), torch.tensor([])
 
         # Concatenate features from all tiles
-        kpts1 = torch.cat(all_kpts1, dim=0).unsqueeze(0)        # Add batch dimension back
-        descs1 = torch.cat(all_descs1, dim=0).unsqueeze(0)      # Add batch dimension back
-        scores1 = torch.cat(all_scores1, dim=0).unsqueeze(0)    # Add batch dimension back
-        scales1 = torch.cat(all_scales1, dim=0).unsqueeze(0)    # Add batch dimension back
-        oris1 = torch.cat(all_oris1, dim=0).unsqueeze(0)    # Add batch dimension back
+        kpts1 = torch.cat(all_kpts1, dim=0).unsqueeze(0)  # Add batch dimension back
+        descs1 = torch.cat(all_descs1, dim=0).unsqueeze(0)  # Add batch dimension back
+        scores1 = torch.cat(all_scores1, dim=0).unsqueeze(0)  # Add batch dimension back
+        scales1 = torch.cat(all_scales1, dim=0).unsqueeze(0)  # Add batch dimension back
+        oris1 = torch.cat(all_oris1, dim=0).unsqueeze(0)  # Add batch dimension back
 
         # Create combined features dictionary
         feats1 = {
-            "keypoints": kpts1,               # Shape: (1, N, 2)
-            "descriptors": descs1,            # Shape: (1, N, D)
-            "keypoint_scores": scores1,                # Shape: (1, N)
-            "image_size": torch.tensor([[frame_width, frame_height]], dtype=torch.float32),  # Use the last tile's image size
+            "keypoints": kpts1,  # Shape: (1, N, 2)
+            "descriptors": descs1,  # Shape: (1, N, D)
+            "keypoint_scores": scores1,  # Shape: (1, N)
+            "image_size": torch.tensor([[frame_width, frame_height]], dtype=torch.float32),
+            # Use the last tile's image size
             "scales": scales1,  # Shape: (1, N)
             "oris": oris1,  # Shape: (1, N)
         }
@@ -261,7 +164,7 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
         logger.warning(f"Image too small or not proper: {image1_T.shape}")
         return 0, torch.tensor([]), torch.tensor([])
 
-#@feature_extractor_cache()
+
 def extractor_wrapper(image_path: Path, max_num_keypoints=8000) -> typing.Tuple[dict, torch.Tensor]:
     """
     Extract features from an image using a given extractor.
@@ -277,7 +180,6 @@ def extractor_wrapper(image_path: Path, max_num_keypoints=8000) -> typing.Tuple[
 
     return feats, image
 
-# @generic_cache_to_disk()
 def matcher_wrapper(feats0, feats1, feature_type="sift") -> torch.Tensor:
     logger.info(f"Start matching")
     matcher = LightGlue(features=feature_type).eval().to(CacheConfig.device)
@@ -285,6 +187,7 @@ def matcher_wrapper(feats0, feats1, feature_type="sift") -> torch.Tensor:
     logger.info(f"Done matching")
 
     return matches01
+
 
 def visualise_matches(feats0, feats1, matches01, image0, image1):
     """
@@ -315,6 +218,7 @@ def visualise_matches(feats0, feats1, matches01, image0, image1):
 
     plt.show()
 
+
 ### TODO readd this
 @get_similarity_cache_to_disk()
 def get_similarity(template_image: Path,
@@ -333,23 +237,17 @@ def get_similarity(template_image: Path,
     with Image.open(template_image) as img:
         template_width, template_height = img.size
 
-    PIL.Image.MAX_IMAGE_PIXELS = 300000000
+    PIL.Image.MAX_IMAGE_PIXELS = 5223651122
     with Image.open(image1) as img:
         img1_width, img1_height = img.size
         # img = img.convert("RGB")
-
-
-
 
     max_num_keypoints = CacheConfig.max_num_keypoints
 
     N_x = N_y = 2  # TODO evaluate this
     if img1_width - 1000 > template_width and img1_height - 1000 > template_height:
-
         N_x = img1_width // template_width
         N_y = img1_height // template_height
-
-
 
     logger.info(f"Using {N_x} x {N_y} tiles")
 
@@ -358,17 +256,16 @@ def get_similarity(template_image: Path,
     logger.info(f"DONE extracting features from {template_image.name}")
 
     logger.info(f"START extracting features from {image1.name}")
-    e = SIFT(max_num_keypoints=max_num_keypoints ).eval().to(device)  # load the extractor
+    e = SIFT(max_num_keypoints=max_num_keypoints).eval().to(device)  # load the extractor
     # e = SuperPoint(max_num_keypoints=max_num_keypoints ).eval().to(device)  # load the extractor
     extractor = TiledExtractor(extractor=e)
     # TODO bundle this into patched extractor
 
-    feats1 = extractor.extract(image_path = image1, N_x=N_x, N_y=N_y)
+    feats1 = extractor.extract(image_path=image1, N_x=N_x, N_y=N_y)
     logger.info(f"DONE extracting features from {image1.name}")
 
     # feats0, image1_T  = extractor_wrapper(image_path=template_image, max_num_keypoints=10000)
     # image1_T = load_image(image1)
-
 
     # matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="superpoint")
     matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="sift")
@@ -401,7 +298,6 @@ def get_similarity(template_image: Path,
         plt.show()
 
     return normalised_sim, m_kpts0, m_kpts1
-
 
 
 def image_patcher(image_np: np.array, N_x: int, N_y: int):
@@ -446,7 +342,6 @@ def image_patcher(image_np: np.array, N_x: int, N_y: int):
             patches.append(patch_name)
 
     return patches, x_offsets, y_offsets
-
 
 
 class TiledExtractor:
@@ -507,7 +402,6 @@ class TiledExtractor:
         feats1["image_size"] = features_image_size
 
         return feats1
-
 
     # def extract(self, image_np, N_x, N_y):
     def extract(self, image_path, N_x, N_y):
@@ -570,9 +464,10 @@ def find_rotation_gen(m_kpts0: np.ndarray,
 
     return M, mask, footprint_polygon
 
+
 def find_rotation_gen_cv2(m_kpts0: np.ndarray,
-                      m_kpts1: np.ndarray,
-                      image_name: str | Path) -> (np.ndarray, np.ndarray, shapely.Polygon):
+                          m_kpts1: np.ndarray,
+                          image_name: str | Path) -> (np.ndarray, np.ndarray, shapely.Polygon):
     """
     find the footprint of the template in the image
     :param m_kpts0:
@@ -683,187 +578,7 @@ def find_patch(template_path: Path,
     return rotated_cropped_image_bbox, footprint
 
 
-def find_patch_tiled(template_path: Path,
-                     large_image_path: Path,
-                     output_path=Path("./output"),
-                     tile_size_x=1200,
-                     tile_size_y=1200,
-                     tile_base_path=Path("./"),
-                     cache_path=Path("./cache"),
-                     MIN_MATCH_COUNT=50, visualise=False) -> np.ndarray:
-    """
-    TODO refactor the parameters
-    TODO tile from the center as well
-    Find the template in the large image by tiling the large image, then iterating through the tiles
 
-    :param tile_size_y:
-    :param tile_size_x:
-    :param template_path:
-    :param large_image_path:
-    :param output_path:
-    :param tile_base_path:
-    :param cache_path:
-    :return:
-    """
-
-    tile_base_path.mkdir(exist_ok=True, parents=True)
-    if cache_path is not None:
-        cache_path.mkdir(exist_ok=True, parents=True)
-    output_path.mkdir(exist_ok=True, parents=True)
-
-    fx = 1
-    fy = 1
-    # keep 70% of the keypoints and descriptors
-    keepers = 100
-
-
-
-    # SIFT Based Feature Extractor
-    detector = cv2.SIFT_create()
-
-    overlap_x = 0
-    overlap_y = 0
-
-
-    # get the keypoints and descriptors of the template image
-    template_image = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
-    template_image = cv2.resize(template_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
-    kp1, des1 = _cached_detect_and_compute(detector, img=template_image,
-                                           img_path=template_path,
-                                           cache_path=cache_path)
-
-    large_image = Image.open(large_image_path).convert("L")
-    large_image = np.array(large_image)
-
-    kp2, des2 = _cached_tiled_keypoints_and_descriptors_extraction(detector,
-                                                                   large_image,
-                                                                   tile_size_x, tile_size_y, overlap_x, overlap_y,
-                                                                   tile_base_path, cache_path=cache_path)
-
-    # kp2, des2 = _cached_tiled_keypoints_and_descriptors_extraction(detector, large_image,
-    #                                                                  tile_size_x, tile_size_y, overlap_x, overlap_y,
-    #                                                    tile_base_path, cache_path)
-    del (large_image)
-    gc.collect()
-
-    ### match the keypoints and descriptors of both images
-
-    num_to_keep = len(kp2) // keepers
-    indices_to_keep = sorted(random.sample(range(len(kp2)), num_to_keep))
-
-    kp2 = [kp2[i] for i in indices_to_keep]
-    des2 = [des2[i] for i in indices_to_keep]
-    des2 = np.array(des2)
-
-    if len(kp1) > 10 and len(kp2) > 10:
-        ## SIFT
-        FLANN_INDEX_KDTREE = 1
-        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
-
-        # FIXME the caching of matches does not work
-        # matches = _cached_matcher(flann, des1, des2, template_path, Path(large_image_path), k=2,
-        #                           cache_path=cache_path)
-        matches = _cached_matcher(flann, des1, des2, template_path, Path(large_image_path), k=2,
-                                  cache_path=None)
-
-    good = []
-    try:
-        for m, n in matches:
-            if m.distance < 0.7 * n.distance:
-                good.append(m)
-    except Exception as e:
-        logger.error("Not enough matches are found - {}".format(len(matches)))
-
-    if len(good) > MIN_MATCH_COUNT:
-        logger.info(f"{len(good)} good matches found.")
-        src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
-
-        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-
-        ## we take the shape of the first image which was transformed
-        ## then we create a box around the transformed image and project it new image
-        h, w = template_image.shape
-        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
-                                                                                   2)  # This is the box of the query image
-
-        dst = cv2.perspectiveTransform(pts, M)
-
-        new_image_footprint = dst
-        # draw the matches outer box
-        footprint = np.int32(dst.reshape(4, 2))
-        ## TODO create the footprint from that
-        footprint = shapely.Polygon(footprint.reshape(4, 2))
-
-
-
-
-
-        if False:
-            fig = plt.figure(figsize=(20, 20))
-            # large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
-            # large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
-
-            large_image = Image.open(
-                large_image_path)  # Replace with your image file path
-            large_image = np.array(large_image)
-
-            large_image = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
-            large_image = cv2.resize(large_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
-
-            plt.imshow(large_image, 'gray')
-            fig.savefig(output_path / f"{large_image_path}_large_image_footprint.jpg")  # TODO give it a good name
-            plt.show()
-
-            draw_params = dict(matchColor=(0, 255, 0),  # Draw matches in green color
-                               singlePointColor=None,
-                               flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-
-            fig = plt.figure(figsize=(20, 20))
-            img_matches = cv2.drawMatches(template_image, kp1, large_image, kp2, good, None, **draw_params)
-            plt.imshow(img_matches, 'gray')
-            fig.savefig(output_path / f"{large_image_path}_large_image_match.jpg")
-            plt.show()
-
-        theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
-        print(f"The camera rotated: {round(theta, 2)} degrees")
-
-        # TODO class variable
-        M_ = np.linalg.inv(M)
-
-
-
-        template_image = Image.open(
-            template_path)  # Replace with your image file path
-        if template_image.mode != "RGB":
-            template_image = template_image.convert("RGB")
-        template_image = np.array(template_image)
-
-
-        large_image = Image.open(large_image_path)  # Replace with your image file path
-        if large_image.mode != "RGB":
-            large_image = large_image.convert("RGB")
-        large_image = np.array(large_image)
-
-
-        rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
-                                                         (template_image.shape[1], template_image.shape[0]))
-        if visualise:
-            fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
-            # Display the result
-            plt.imshow(rotated_cropped_image_bbox)
-            # plt.axis('off')  # Hide axis
-            plt.show()
-        rotated_cropped_image_bbox_path = output_path / f"rotated_cropped_image_bbox_{large_image_path.stem}.jpg"
-        cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
-
-        return rotated_cropped_image_bbox
-
-    else:
-        logger.error("Not enough good matches are found - %d/%d" % (len(good), MIN_MATCH_COUNT))
-        return False
 
 
 def find_patch_stacked(template_path, large_image_paths, output_path,
@@ -901,9 +616,6 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
             pass
 
     return crops
-
-
-
 
 
 def project_bounding_box(label: typing.Union[Polygon, ImageLabel], M: np.ndarray) -> typing.Union[Polygon, ImageLabel]:
@@ -1033,7 +745,6 @@ class ImagePatchFinder(object):
         """
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path,
                                                           Path(self.large_image_path))
-
 
         if normalised_sim < similarity_threshold or len(m_kpts0) < 10 or len(m_kpts1) < 10:
             logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
