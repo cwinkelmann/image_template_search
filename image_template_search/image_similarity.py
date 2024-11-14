@@ -689,7 +689,7 @@ def project_annotations_to_crop(buffer: shapely.Polygon,
     return cropped_annotations, buffer
 
 
-class ImagePatchFinder(object):
+class ImagePatchFinderLG(object):
     """
     find a patch on an image in another image and calculate the homography between the two
     """
@@ -738,6 +738,7 @@ class ImagePatchFinder(object):
         """
         Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
         TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
+        :param similarity_threshold:
         :param template_path:
         :param large_image_path:
         :param output_path:

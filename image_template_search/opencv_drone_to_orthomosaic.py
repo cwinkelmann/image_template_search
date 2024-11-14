@@ -5,7 +5,7 @@ Use open CV tile based image maching to find the drone image in the orthomosaic
 
 import os
 
-from image_template_search.image_patch_finder import find_patch_tiled, ImagePatchFinderCV
+from image_template_search.image_patch_finder import ImagePatchFinderCV
 from image_template_search.util.util import visualise_image, visualise_polygons
 
 os.environ["OPENCV_IO_MAX_IMAGE_PIXELS"] = str(2**30) ## TODO this is a quickfix
@@ -16,10 +16,6 @@ from pathlib import Path
 
 
 if __name__ == "__main__":
-
-
-
-
 
     base_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
     drone_image = base_path / "San_STJB01_10012023/template_images/San_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"

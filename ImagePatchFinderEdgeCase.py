@@ -2,7 +2,7 @@ from pathlib import Path
 
 from shapely.geometry.polygon import Polygon
 
-from image_template_search.image_similarity import ImagePatchFinder
+from image_template_search.image_similarity import ImagePatchFinderLG
 from PIL import Image as PILImage
 
 from image_template_search.util.util import visualise_image
@@ -23,9 +23,9 @@ with PILImage.open(template_image_path) as img:
         [(0, 0), (source_image_width, 0), (source_image_width, source_image_height), (0, source_image_height)])
 
 
-ipf_t = ImagePatchFinder(template_path=template_image_path,
-                         template_polygon=template_extent,
-                         large_image_path=cropped_destination_image_path)
+ipf_t = ImagePatchFinderLG(template_path=template_image_path,
+                           template_polygon=template_extent,
+                           large_image_path=cropped_destination_image_path)
 
 template_match = ipf_t.find_patch(similarity_threshold=0.000005)
 

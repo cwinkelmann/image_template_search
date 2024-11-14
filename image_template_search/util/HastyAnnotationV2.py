@@ -33,14 +33,14 @@ class LabelClass(BaseModel):
 class Keypoint(BaseModel):
     x: int
     y: int
-    id: UUID
-    norder: int
-    visible: bool
-    created_by: UUID
-    updated_by: Optional[UUID]
-    create_date: datetime
-    update_date: Optional[datetime]
-    keypoint_class_id: UUID
+    id: UUID = Field(default=str(uuid.uuid4()))
+    norder: int = Field(default=0)
+    visible: bool = Field(True)
+    created_by: Optional[UUID] = Field(default=str(uuid.uuid4()))
+    updated_by: Optional[UUID] = Field(default=str(uuid.uuid4()))
+    create_date: Optional[datetime] = Field(default=datetime.now())
+    update_date: Optional[datetime] = Field(default=datetime.now())
+    keypoint_class_id: UUID = Field(default=str(uuid.uuid4()), alias='id')
 
 
 
@@ -113,6 +113,35 @@ class AnnotatedImage(BaseModel):
     image_mode: Optional[str] = None
 
 
+class KeypointClass(BaseModel):
+    keypoint_class_id: UUID
+    keypoint_class_name: str
+    norder: int
+    editor_x: Optional[float] = None
+    editor_y: Optional[float] = None
+    max_points: int
+    min_points: int
+
+
+class KeypointSchema(BaseModel):
+    keypoint_schema_id: UUID
+    keypoint_schema_name: str
+    keypoint_schema_type: str
+    associated_label_classes: List[UUID]
+    keypoint_classes: List[KeypointClass]
+    keypoint_skeleton: List  # Define this as List[Any] if you expect various data types in the skeleton
+
+class TagGroup(BaseModel):
+    group_id: UUID
+    group_name: str
+    group_type: str
+    tags: List[str]
+
+# TODO check if this format is correct
+class Attribute(BaseModel):
+    name: str
+    type: str
+    values: List
 
 class HastyAnnotationV2(BaseModel):
     project_name: str = Field(alias='project_name')
@@ -120,7 +149,10 @@ class HastyAnnotationV2(BaseModel):
     export_format_version: str = Field(alias='export_format_version', default="1.1")
     export_date: datetime = Field(default=datetime.now())
     label_classes: List[LabelClass]
+    keypoint_schemas: List[KeypointSchema]
+    tag_groups: List[TagGroup]
     images: List[AnnotatedImage]
+    attributes: List[Attribute]
 
     def save(self, file_path: Path):
         with open(file_path, 'w') as json_file:

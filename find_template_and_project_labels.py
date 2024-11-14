@@ -23,7 +23,7 @@ from shapely.geometry.polygon import Polygon
 
 from conf.config_dataclass import CacheConfig
 from detection_deduplication import find_objects, find_objects_individual_all
-from image_template_search.image_similarity import ImagePatchFinder, project_bounding_box
+from image_template_search.image_similarity import ImagePatchFinderLG, project_bounding_box
 from image_template_search.util.CoveredObjectType import CoveredObject
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, AnnotatedImage
 from image_template_search.util.TemplateDataType import TemplateData
@@ -49,9 +49,9 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
         [(0, 0), (source_image_width, 0), (source_image_width, source_image_height), (0, source_image_height)])
 
     ## find the rough location of the template drone image in the orthomosaic
-    ipf_t = ImagePatchFinder(template_path=template_image_path,
-                             template_polygon=template_extent,
-                             large_image_path=large_image_path)
+    ipf_t = ImagePatchFinderLG(template_path=template_image_path,
+                               template_polygon=template_extent,
+                               large_image_path=large_image_path)
 
     found_match = ipf_t.find_patch(similarity_threshold=0.0005)
 
@@ -119,9 +119,9 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
         )
 
     ## find the rough location of the template drone image in the orthomosaic
-    ipf_t = ImagePatchFinder(template_path=template_image_path,
-                             template_polygon=template_extent,
-                             large_image_path=large_image_path)
+    ipf_t = ImagePatchFinderLG(template_path=template_image_path,
+                               template_polygon=template_extent,
+                               large_image_path=large_image_path)
 
     found_match = ipf_t.find_patch(similarity_threshold=0.0005)
 
@@ -202,9 +202,9 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
         height = CacheConfig.patch_size
         template_extent = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
 
-        ipf_refined = ImagePatchFinder(template_path=source_image_template.template_image_path,
-                                 template_polygon=template_extent,
-                                 large_image_path=td.template_image_path)
+        ipf_refined = ImagePatchFinderLG(template_path=source_image_template.template_image_path,
+                                         template_polygon=template_extent,
+                                         large_image_path=td.template_image_path)
 
         found_match = ipf_refined.find_patch(similarity_threshold=0.0005)
 
@@ -273,9 +273,9 @@ def forward_template_matching_projection(
 
 
     logger.warning(f"remove the source image extent parameter because it is not really necessary")
-    ipf = ImagePatchFinder(template_path=source_image_path,
-                           template_polygon=source_image_extent,
-                           large_image_path=dest_image_path)
+    ipf = ImagePatchFinderLG(template_path=source_image_path,
+                             template_polygon=source_image_extent,
+                             large_image_path=dest_image_path)
 
     found_match = ipf.find_patch(similarity_threshold=0.0001)
 
@@ -340,9 +340,9 @@ def forward_template_matching_projection(
 
             visualise_image(image_path=template_image_path, title="template image")
 
-            ipf_t = ImagePatchFinder(template_path=template_image_path,
-                                     template_polygon=template_extent,
-                                     large_image_path=cropped_destination_image_path)
+            ipf_t = ImagePatchFinderLG(template_path=template_image_path,
+                                       template_polygon=template_extent,
+                                       large_image_path=cropped_destination_image_path)
 
             template_match = ipf_t.find_patch(similarity_threshold=0.000005) # FIXME this is where an error can come from. If both images
             if template_match:

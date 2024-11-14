@@ -9,6 +9,8 @@ import pandas as pd
 from image_template_search.util.georeferenced_image import ExtendImageMetaData
 from image_template_search.util.util import get_exif_metadata
 
+metadata_folder = Path("./")
+
 folder = Path("/Users/christian/data/2TB/ai-core/data/02.02.21/FMO03")
 folder_2 = Path("/Users/christian/data/2TB/ai-core/data/02.02.21/FMO02")
 folder_3 = Path("/Users/christian/data/2TB/ai-core/data/03.02.21/FMO04")
@@ -24,7 +26,6 @@ def get_mission_metadata(folder: Path):
         image_meta_data.model_dump()
     return metadata
 
-metadata_folder = Path("./")
 
 for f in folders:
     md = get_mission_metadata(f)

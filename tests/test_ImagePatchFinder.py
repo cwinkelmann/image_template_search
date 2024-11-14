@@ -6,7 +6,7 @@ from pathlib import Path
 from shapely.geometry import Polygon
 from unittest.mock import patch, MagicMock
 
-from image_template_search.image_similarity import ImagePatchFinder
+from image_template_search.image_similarity import ImagePatchFinderLG
 
 
 # Sample fixture for the ImagePatchFinder instance
@@ -16,12 +16,12 @@ def patch_finder():
     large_image_path = Path("./tests/data/DJI_0018.JPG")
     template_polygon = Polygon([(0, 0), (0, 10), (10, 10), (10, 0)])
 
-    ipf = ImagePatchFinder(template_path=template_path,
-                           template_polygon=template_polygon,
-                           large_image_path=large_image_path)
+    ipf = ImagePatchFinderLG(template_path=template_path,
+                             template_polygon=template_polygon,
+                             large_image_path=large_image_path)
 
 
-    return ImagePatchFinder(template_path, template_polygon, large_image_path)
+    return ImagePatchFinderLG(template_path, template_polygon, large_image_path)
 
 
 def test_init(patch_finder):
