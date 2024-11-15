@@ -98,7 +98,9 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector,
     return kp2, des2
 
 
-def project_image(M, template_path, large_image_path, output_path, visualise=False) -> Path:
+def project_image(M, template_path, large_image_path, output_path,
+                  visualise=False,
+                  buffer=0) -> Path:
     """
     :param M:
     :param template_path:
@@ -122,7 +124,7 @@ def project_image(M, template_path, large_image_path, output_path, visualise=Fal
     large_image = np.array(large_image)
 
     rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
-                                                     (template_image.shape[1], template_image.shape[0]))
+                                                     (template_image.shape[1]+buffer, template_image.shape[0]+buffer))
     if visualise:
         fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
         # Display the result

@@ -1,5 +1,5 @@
 """
-Load annotations into FiftyOne for Evaluation.
+Load annotations into FiftyOne for Evaluation OR modify annotations in CVAT
 
 """
 
