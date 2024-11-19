@@ -23,11 +23,11 @@ if __name__ == "__main__":
     # image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_DDeploy.tif" # demo
     # image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_DDeploy.tif" # DroneDeploy
     # image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_Pix4D.tiff" # pix4D
-    image_2 =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_Agisoft.tif" # metashape
+    orthomosaic_path = base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_Agisoft.tif" # metashape
     interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
 
     drone_image = base_path / "FCD01-02-03/template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
-    image_2 =  base_path / "FCD01-02-03/Metashape_FCD01-02-03-orthomosaic.tif" # metashape
+    orthomosaic_path = base_path / "FCD01-02-03/Metashape_FCD01-02-03-orthomosaic.tif" # metashape
 
 
     # base_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     output_path = interm_path / "output"
 
     ipf = ImagePatchFinderCV(template_path=drone_image,
-                             large_image_path=image_2)
+                             large_image_path=orthomosaic_path)
 
     ipf.find_patch()
     ax_i = visualise_image(image_path=ipf.large_image_path, show=False, dpi=50)

@@ -60,7 +60,9 @@ def _create_keypoints_s(hA_image: AnnotatedImage) -> List[fo.Keypoint]:
     w, h = hA_image.width, hA_image.height
 
     for r in hA_image.labels:
-        pt = (int(r.centroid.x) / w, int(r.centroid.y) / h)
+
+
+        pt = (int(r.incenter_centroid.x) / w, int(r.incenter_centroid.y) / h)
         lab = r.class_name
 
         kp = fo.Keypoint(
@@ -69,8 +71,8 @@ def _create_keypoints_s(hA_image: AnnotatedImage) -> List[fo.Keypoint]:
             label=str(lab),
             points=[pt],
             # attributes=r.attributes,
-            attributes={"custom_attribute": {"bla": "keks"}},
-            tags=["bla", "keks"]
+            # attributes={"custom_attribute": {"bla": "keks"}},
+            # tags=["bla", "keks"]
         )
 
         keypoints.append(kp)
@@ -125,10 +127,12 @@ def _create_boxes_s(hA_image: AnnotatedImage) -> typing.List[fo.Detection]:
 
 
 def debug_hasty_fiftyone(
-        images_dir: Path,
+        images_set = List[Path],
+        # images_dir: Path,
         hA_gt: List[AnnotatedImage] = None,
         hA_dets: List[AnnotatedImage] = None,
-        dataset_name="projection_comparison"):
+        dataset_name="projection_comparison",
+        type="points"):
     """
     Display these annotations in Fifty One
     :return:
@@ -136,7 +140,7 @@ def debug_hasty_fiftyone(
     # dataset = fo.Dataset.from_images_dir(images_dir=images_dir)
     # TODO ensure detections and gt are the same set
 
-    images_set: list[Path] = [images_dir / i.image_name for i in hA_gt]
+    # images_set: list[Path] = [images_dir / i.image_name for i in hA_gt]
     # Specify a name for the dataset
 
 
@@ -163,13 +167,13 @@ def debug_hasty_fiftyone(
                            hasty_image_id=hA_image.image_id,
                            hasty_image_name=hA_image.image_name)
 
-        # sample['ground_truth'] = fo.Keypoints(keypoints=keypoints)
-        sample['ground_truth_boxes'] = fo.Detections(detections=boxes)
 
-        # # detections
-        # if hA_dets is not None:
-        #     dets_points, dets_labels = _get_points_and_labels(sample.filepath, df=dets)
-        #     sample['predictions'] = fo.Keypoints(keypoints=_create_keypoints(dets_points, dets_labels))
+        if type == "points":
+            sample['ground_truth_points'] = fo.Keypoints(keypoints=keypoints)
+        elif type == "boxes":
+            sample['ground_truth_boxes'] = fo.Detections(detections=boxes)
+        else:
+            raise ValueError("Unknown type, use 'boxes' or 'points'")
 
         # sample.save()
         samples.append(sample)
@@ -191,9 +195,18 @@ if __name__ == '__main__':
     # annotations_file_path = base_path / "San_STJB01_10012023/template_images/methods_paper_labels_points.json"
     # load hasty annotations
     hA = hA_from_file(file_path=annotations_file_path)
-    hA.images = [i for i in hA.images if i.image_name in [drone_image.name]]
-    assert len(hA.images) == 1, "There should be only a single image left"
-    drone_image_label = hA.images[0]
+    hA_images = [i for i in hA.images if i.image_name in [drone_image.name]]
+
+    projected_annotation_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/template_annotations_projected.json")
+    projected_image = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/matched_template_DJI_0366_Metashape_FCD01-02-03-orthomosaic_cropped.jpg")
+    hA_proj = hA_from_file(file_path=projected_annotation_path)
+    hA_proj_images = [i for i in hA_proj.images if i.image_name in [projected_image.name]]
+
+    hA.images = hA_images + hA_proj_images
+
+    assert len(hA.images) == 2, "There should be only a single image left"
+
+    images_set = [projected_image, drone_image]
 
     dataset_name = "projection_comparison"
     try:
@@ -202,11 +215,15 @@ if __name__ == '__main__':
         pass
 
     # create dot annotations
-    dataset = debug_hasty_fiftyone(hA_dets=hA.images, hA_gt=hA.images, images_dir=images_dir, dataset_name=dataset_name)
+    dataset = debug_hasty_fiftyone(hA_dets=hA.images,
+                                   hA_gt=hA.images,
+                                   images_set=images_set,
+                                   dataset_name=dataset_name,
+                                   type="points")
 
     ## Launch FiftyOne inspection app
-    # session = fo.launch_app(dataset, port=5151)
-    # session.wait()
+    session = fo.launch_app(dataset, port=5151)
+    session.wait()
 
     # sample_id = dataset.first().id
     # view = dataset.select(sample_id)

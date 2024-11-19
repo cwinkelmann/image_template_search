@@ -60,6 +60,7 @@ def _cached_detect_and_compute(detector, img, img_path, cache_path: Path = None)
 
 
     if cache_path is not None:
+        logger.info(f"Cache Path: {cache_path}")
         img_id = get_image_id(img_path)
         keypooints_cache_path = cache_path / f"{img_path.stem}_{img_id}_keypoints.pkl"
         descriptors_cache_path = cache_path / f"{img_path.stem}_{img_id}_descriptors.pkl"

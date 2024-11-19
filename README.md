@@ -47,6 +47,11 @@ To do this a bigger Orthomosaic is cut to the area of the drone image.
 clip_orthomosaic_by_drone_image_loc.py
 
 ### Find image patches in bigger orthomosaics
+Use an template image, an orthomosaic and hasty annotation to map all marks to a projected drone image.
+
+opencv_drone_to_orthomosaic.py
+
+
 This template from: 
 
 There are 3 set of orthomosaics, with for mosaics each from metashape, pix4d, dronedeploy, opendronemap

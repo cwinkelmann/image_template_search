@@ -709,7 +709,7 @@ class ImagePatchFinderLG(object):
     mask: np.ndarray
     theta: float
 
-    def __init__(self, template_path, template_polygon, large_image_path):
+    def __init__(self, template_path, large_image_path):
         """
 
         :param template_path: The image which is to be found in the large image
@@ -725,6 +725,10 @@ class ImagePatchFinderLG(object):
         self.mask = None
 
         self.template_path = template_path
+
+        width, height = get_image_dimensions(template_path)
+        template_polygon = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
+
         self.template_polygon = template_polygon
         self.large_image_path = large_image_path
         self.matched_templates = []

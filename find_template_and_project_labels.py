@@ -50,7 +50,6 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
 
     ## find the rough location of the template drone image in the orthomosaic
     ipf_t = ImagePatchFinderLG(template_path=template_image_path,
-                               template_polygon=template_extent,
                                large_image_path=large_image_path)
 
     found_match = ipf_t.find_patch(similarity_threshold=0.0005)

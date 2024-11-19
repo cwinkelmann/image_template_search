@@ -8,6 +8,7 @@ import copy
 import json
 from pathlib import Path
 
+import numpy as np
 import shapely
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -15,8 +16,36 @@ from shapely import Polygon
 from typing import Optional, List, Dict
 from datetime import datetime
 import pandas as pd
+from scipy.spatial import Voronoi, voronoi_plot_2d
 
+def chebyshev_center(coords: list) -> shapely.Point:
+    """
+    find the Chebyshev center of a polygon, which is not the centroid but the point that is furthest away from the edges
+    In a Snake shaped polygon, the centroid would be in the middle of the snake, but the Chebyshev center would be at the head of the snake
 
+    :param coords:
+    :return:
+    """
+    # Compute the Voronoi diagram for the vertices of the triangles
+    points = np.array(coords)
+    vor = Voronoi(points)
+
+    polygon = Polygon(coords)
+
+    # Find the Voronoi vertices inside the polygon
+    voronoi_vertices = [shapely.Point(vertex) for vertex in vor.vertices if polygon.contains(shapely.Point(vertex))]
+
+    # Calculate the distance to the polygon's edges for each vertex
+    max_distance = 0
+    center_point = None
+    for vertex in voronoi_vertices:
+        distance = vertex.distance(polygon.exterior)
+        if distance > max_distance:
+            max_distance = distance
+            center_point = vertex
+
+    center_point = shapely.Point(int(round(center_point.x)), int(round(center_point.y)))
+    return center_point
 
 class LabelClass(BaseModel):
     class_id: str
@@ -81,6 +110,29 @@ class ImageLabel(BaseModel):
         """
         # TODO adobt this so it works with polygons too
         return self.bbox_polygon.centroid
+
+    @property
+    def incenter_centroid(self) -> shapely.Point:
+        """
+        Find the point within the polygon that is closest to the centroid
+        :return:
+        """
+        if self.polygon is not None and len(self.polygon) > 0:
+            center_point = chebyshev_center(self.polygon)
+
+        elif self.keypoints is not None and len(self.keypoints) > 0:
+            if self.keypoints[0].keypoint_class_id == UUID('ed18e0f9-095f-46ff-bc95-febf4a53f0ff'):
+                center_point = shapely.Point(self.keypoints[0].x, self.keypoints[0].y)
+            else:
+                raise NotImplementedError("Not implemented yet. It is a bit of a hack")
+                # TODO implement this with the keypoint schema
+                pass
+        elif self.bbox_polygon is not None:
+            center_point = self.bbox_polygon.centroid
+        else:
+            center_point = None
+
+        return center_point
 
 
     @property
