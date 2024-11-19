@@ -14,7 +14,11 @@ install LightGlue first
 ```bash
 git clone --quiet https://github.com/cvg/LightGlue/
 cd LightGlue
+
+# install the package without output
 pip install --progress-bar off --quiet -e .
+
+# alternative to the above
 pip install -e .
 ```
 
@@ -23,22 +27,27 @@ Then install the requirements
 pip install -r requirements.txt
 ```
 
-## Workflow
-find a small template image t in a larger image l
-
-t ... 1280*1280
-l ... 5000 * 4000
+## Example Workflows
 
 
-t = l ... 5000 * 4000
-
-t ... 5000 * 4000
-l ... 50.000 * 50.000
+### find a small template image t in a larger image l
 
 
-## Usage for the Orthomosaicing paper
+### create a database of images
+image_database.py
+
+read the metadata of images
+
+
+### image_template_search/detection_deduplication.py
+Iterate through all images and their annotations
+
+### clip a buffer around an image location from an orthomosaic
+To do this a bigger Orthomosaic is cut to the area of the drone image.
+clip_orthomosaic_by_drone_image_loc.py
+
+### Find image patches in bigger orthomosaics
 This template from: 
 
 There are 3 set of orthomosaics, with for mosaics each from metashape, pix4d, dronedeploy, opendronemap
 - ../IguanasFromAbove/Orthomosaics for quality analysis/<Mission_Name>/
-- 

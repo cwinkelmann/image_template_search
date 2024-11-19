@@ -149,10 +149,10 @@ class HastyAnnotationV2(BaseModel):
     export_format_version: str = Field(alias='export_format_version', default="1.1")
     export_date: datetime = Field(default=datetime.now())
     label_classes: List[LabelClass]
-    keypoint_schemas: List[KeypointSchema]
-    tag_groups: List[TagGroup]
+    keypoint_schemas: List[KeypointSchema] = Field(default=[])
+    tag_groups: List[TagGroup] = Field(default=[])
     images: List[AnnotatedImage]
-    attributes: List[Attribute]
+    attributes: List[Attribute] = Field(default=[])
 
     def save(self, file_path: Path):
         with open(file_path, 'w') as json_file:

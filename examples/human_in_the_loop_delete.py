@@ -39,7 +39,7 @@ if __name__ == '__main__':
     dataset_name = "projection_comparison"
     anno_key = "cvat_basic_recipe"
 
-    cleanup = True
+    cleanup = False
 
     # create dot annotations
     # results, view = retrieve_from_cvat(anno_key=anno_key, dataset_name = dataset_name)

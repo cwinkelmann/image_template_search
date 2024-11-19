@@ -425,7 +425,7 @@ def demo_template():
     # random.shuffle(hA.images)
 
     hA.images = [i for i in hA.images if i.image_name in [
-                            # "DJI_0049.JPG",
+                            "DJI_0049.JPG",
        # "DJI_0050.JPG",
        #  "DJI_0051.JPG",
        #                  "DJI_0052.JPG",
@@ -462,11 +462,11 @@ def demo_template():
 
        #  "DJI_0088.JPG",
 
-         "DJI_0091.JPG",  # with 71 a probelmatic image
+        # "DJI_0091.JPG",  # with 71 a probelmatic image
         # "DJI_0094.JPG",
         # "DJI_0097.JPG",
         # "DJI_0100.JPG",
-        "DJI_0101.JPG",
+        # "DJI_0101.JPG",
     ]]
 
 

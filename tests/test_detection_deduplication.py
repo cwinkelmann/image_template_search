@@ -77,8 +77,8 @@ def test_find_annotated_template_matches(hA: HastyAnnotationV2,
         # TODO visualise the three images including the annotations
         # visualise_image(template_image_path, show=True,
         #                 title="Template from the Source image")
-        # visualise_image(output_path / 'warped_source_template_source_DJI_0049.1280_match_DJI_0063.jpg', show=True,
-        #                 title="Warped Template from the other image")
+        visualise_image(output_path / image_stacks[0].covered_templates[0].image_name, show=True,
+                        title="Warped Template from the other image")
 
 
 def test_find_annotated_template_matches_only(hA: HastyAnnotationV2,

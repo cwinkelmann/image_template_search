@@ -425,7 +425,7 @@ class TiledExtractor:
         return feats
 
 
-def find_rotation_gen(m_kpts0: np.ndarray,
+def find_rotation_gen_kornia(m_kpts0: np.ndarray,
                       m_kpts1: np.ndarray,
                       image_name: typing.Union[str, Path]) -> (np.ndarray, np.ndarray, shapely.Polygon):
     """
@@ -518,7 +518,7 @@ def find_patch(template_path: Path,
     template_identifier = template_path.stem
     large_image_identifier = large_image_path.stem
 
-    M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
+    M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
                                            m_kpts1.cpu().numpy(),
                                            image_name=large_image_path)
 
@@ -757,7 +757,7 @@ class ImagePatchFinderLG(object):
             output_path = Path(output_path)
 
         logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
-        M, mask, footprint = find_rotation_gen(m_kpts0.cpu().numpy(),
+        M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
                                                m_kpts1.cpu().numpy(),
                                                image_name=self.large_image_path)
 
