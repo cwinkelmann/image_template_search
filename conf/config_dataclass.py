@@ -10,7 +10,7 @@ class CacheConfig:
     visualise_matching: bool = False
     show_visualisation: bool = True
     device: str = "cpu"
-    caching: bool = True
+    caching: bool = False
     max_num_keypoints = 6000
     patch_size = 640
     patch_size_offset = 400

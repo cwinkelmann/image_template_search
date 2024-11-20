@@ -1,22 +1,20 @@
-import typing
-
-import uuid
-from uuid import UUID
-import random
-
 import copy
 import json
+import typing
+import uuid
+from datetime import datetime
 from pathlib import Path
+from typing import Optional, List
+from uuid import UUID
 
 import numpy as np
+import pandas as pd
 import shapely
 from loguru import logger
 from pydantic import BaseModel, Field
+from scipy.spatial import Voronoi
 from shapely import Polygon
-from typing import Optional, List, Dict
-from datetime import datetime
-import pandas as pd
-from scipy.spatial import Voronoi, voronoi_plot_2d
+
 
 def chebyshev_center(coords: list) -> shapely.Point:
     """
@@ -47,6 +45,7 @@ def chebyshev_center(coords: list) -> shapely.Point:
     center_point = shapely.Point(int(round(center_point.x)), int(round(center_point.y)))
     return center_point
 
+
 class LabelClass(BaseModel):
     class_id: str
     parent_class_id: Optional[str]
@@ -58,32 +57,30 @@ class LabelClass(BaseModel):
     attributes: List[str]
 
 
-
 class Keypoint(BaseModel):
     x: int
     y: int
-    id: UUID = Field(default=str(uuid.uuid4()))
+    id: str = Field(default=str(uuid.uuid4()))
     norder: int = Field(default=0)
     visible: bool = Field(True)
-    created_by: Optional[UUID] = Field(default=str(uuid.uuid4()))
-    updated_by: Optional[UUID] = Field(default=str(uuid.uuid4()))
+    created_by: Optional[str] = Field(default=str(uuid.uuid4()))
+    updated_by: Optional[str] = Field(default=str(uuid.uuid4()))
     create_date: Optional[datetime] = Field(default=datetime.now())
     update_date: Optional[datetime] = Field(default=datetime.now())
-    keypoint_class_id: UUID = Field(default=str(uuid.uuid4()), alias='id')
-
+    keypoint_class_id: str = Field(alias='keypoint_class_id')
 
 
 class ImageLabel(BaseModel):
     id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='id')
     class_name: str = Field(alias='class_name')
     bbox: Optional[List[int]] = Field(None, alias='bbox')
-    polygon: Optional[List[List[int]]] = Field(default=None) # A list of points that make up the polygon
+    polygon: Optional[List[List[int]]] = Field(default=None)  # A list of points that make up the polygon
     mask: Optional[List[int]] = Field(default=[])
     z_index: Optional[int] = 0
     attributes: dict = {}
     keypoints: Optional[List[Keypoint]] = None
-    # incenter: Optional[List[int]] = None # The point which is either the centroid or the nearest point to the centroid that is withing the shape
 
+    # incenter: Optional[List[int]] = None # The point which is either the centroid or the nearest point to the centroid that is withing the shape
 
     @property
     def x1y1x2y2(self):
@@ -109,7 +106,10 @@ class ImageLabel(BaseModel):
         :return:
         """
         # TODO adobt this so it works with polygons too
-        return self.bbox_polygon.centroid
+        if self.bbox is not None:
+            return self.bbox_polygon.centroid
+        if self.keypoints is not None:
+            return shapely.Point(self.keypoints[0].x, self.keypoints[0].y)
 
     @property
     def incenter_centroid(self) -> shapely.Point:
@@ -121,19 +121,18 @@ class ImageLabel(BaseModel):
             center_point = chebyshev_center(self.polygon)
 
         elif self.keypoints is not None and len(self.keypoints) > 0:
-            if self.keypoints[0].keypoint_class_id == UUID('ed18e0f9-095f-46ff-bc95-febf4a53f0ff'):
+            if self.keypoints[0].keypoint_class_id == 'ed18e0f9-095f-46ff-bc95-febf4a53f0ff':
                 center_point = shapely.Point(self.keypoints[0].x, self.keypoints[0].y)
             else:
-                raise NotImplementedError("Not implemented yet. It is a bit of a hack")
+                logger.warning("Not properly implemented yet. It is a bit of a hack")
                 # TODO implement this with the keypoint schema
-                pass
+                return shapely.Point(self.keypoints[0].x, self.keypoints[0].y)
         elif self.bbox_polygon is not None:
             center_point = self.bbox_polygon.centroid
         else:
             center_point = None
 
         return center_point
-
 
     @property
     def polygon_s(self) -> shapely.Polygon:
@@ -152,6 +151,7 @@ class ImageLabel(BaseModel):
     def __hash__(self):
         return self.id
 
+
 class AnnotatedImage(BaseModel):
     image_id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='image_id')
     image_name: str = Field(alias='image_name', description="Name of the image file")
@@ -166,7 +166,7 @@ class AnnotatedImage(BaseModel):
 
 
 class KeypointClass(BaseModel):
-    keypoint_class_id: UUID
+    keypoint_class_id: str
     keypoint_class_name: str
     norder: int
     editor_x: Optional[float] = None
@@ -176,24 +176,27 @@ class KeypointClass(BaseModel):
 
 
 class KeypointSchema(BaseModel):
-    keypoint_schema_id: UUID
+    keypoint_schema_id: str
     keypoint_schema_name: str
     keypoint_schema_type: str
-    associated_label_classes: List[UUID]
+    associated_label_classes: List[str]
     keypoint_classes: List[KeypointClass]
     keypoint_skeleton: List  # Define this as List[Any] if you expect various data types in the skeleton
 
+
 class TagGroup(BaseModel):
-    group_id: UUID
+    group_id: str
     group_name: str
     group_type: str
     tags: List[str]
+
 
 # TODO check if this format is correct
 class Attribute(BaseModel):
     name: str
     type: str
     values: List
+
 
 class HastyAnnotationV2(BaseModel):
     project_name: str = Field(alias='project_name')
@@ -219,7 +222,7 @@ class HastyAnnotationV2_flat(BaseModel):
     export_date: datetime
     label_classes: List[LabelClass]
 
-    image_id: str | int = Field(default=uuid.uuid4(), alias='image_id')
+    image_id: str | int = Field(default=str(uuid.uuid4()), alias='image_id')
     image_name: str
     dataset_name: str
     ds_image_name: Optional[str] = None
@@ -238,7 +241,6 @@ class HastyAnnotationV2_flat(BaseModel):
     z_index: int
     ID: Optional[str] = None
 
-
     @property
     def x1y1x2y2(self):
         """
@@ -256,9 +258,6 @@ class HastyAnnotationV2_flat(BaseModel):
     @property
     def centroid(self) -> shapely.Point:
         return self.bbox_polygon.centroid
-
-
-
 
 
 def filter_by_class(hA: HastyAnnotationV2, class_names: Optional[str] = None) -> HastyAnnotationV2:
@@ -301,7 +300,7 @@ def filter_by_image_tags(hA: HastyAnnotationV2, image_tags: Optional[List[str]] 
         filtered_project = copy.deepcopy(hA)
 
         for image in filtered_project.images:
-            filtered_labels = [label for label in image.labels if len(list(set(image.tags) & set(image_tags))) > 0 ]
+            filtered_labels = [label for label in image.labels if len(list(set(image.tags) & set(image_tags))) > 0]
             image.labels = filtered_labels
         return filtered_project
     else:
@@ -318,7 +317,6 @@ def convert_masks_to_bbox(hA: HastyAnnotationV2) -> HastyAnnotationV2:
     # TODO it seems this already implemented in the HastyAnnotationV2 object
 
     return hA
-
 
 
 def remove_images_with_no_labels(project: HastyAnnotationV2) -> HastyAnnotationV2:
@@ -341,7 +339,6 @@ def convert_HastyAnnotationV2_to_HastyAnnotationV2flat(project: HastyAnnotationV
 
     for image in project.images:
         for label in image.labels:
-
             ID = label.attributes.get("ID", None)
 
             flat_annotations.append(
@@ -371,6 +368,7 @@ def convert_HastyAnnotationV2_to_HastyAnnotationV2flat(project: HastyAnnotationV
                 )
             )
     return flat_annotations
+
 
 def get_flat_df(project: HastyAnnotationV2) -> pd.DataFrame:
     """
@@ -406,8 +404,6 @@ def get_flat_df(project: HastyAnnotationV2) -> pd.DataFrame:
     return labels_df
 
 
-
-
 def hA_from_file(file_path: Path) -> HastyAnnotationV2:
     """
     Load a HastyAnnotationV2 object from a file
@@ -418,7 +414,6 @@ def hA_from_file(file_path: Path) -> HastyAnnotationV2:
         data = json.load(f)
         hA = HastyAnnotationV2(**data)
     return hA
-
 
 
 def label_dist_edge_threshold(patch_size, source_image):

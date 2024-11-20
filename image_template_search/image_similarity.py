@@ -475,7 +475,7 @@ def find_rotation_gen_cv2(m_kpts0: np.ndarray,
     :param image_name:
     :return:
     """
-    logger.warning(f"This is deprecated!")
+
     if isinstance(image_name, str):
         image_name = Path(image_name)
     logger.info(f"RANSAC Threshold: {CacheConfig.ransac_reproj_threshold}")
