@@ -16,6 +16,17 @@ from pyproj import Transformer
 from rasterio import CRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
+from pathlib import Path
+import rasterio
+from rasterio.enums import Resampling
+from rasterio.shutil import copy
+from concurrent.futures import ThreadPoolExecutor
+
+from loguru import logger
+import rasterio
+from rasterio.windows import Window
+from pathlib import Path
+from rasterio.enums import Resampling
 
 def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, target_crs = "EPSG:4326"):
     """
@@ -132,3 +143,93 @@ def save_polygon_as_geojson(polygon: shapely.geometry.Polygon, file_path: Path, 
     # Write to GeoJSON file
     with open(file_path, "w") as f:
         json.dump(geojson_data, f)
+
+
+def convert_to_cog(input_file, output_file):
+    """
+    Convert a raster to a Cloud-Optimized GeoTIFF (COG)
+    :param input_file:
+    :param output_file:
+    :return:
+    """
+    cog_options = {
+        "BLOCKXSIZE": 2048,  # Tile width
+        "BLOCKYSIZE": 2048,  # Tile height
+        "TILED": True,  # Enable tiling
+        "COMPRESS": "LZW",  # Compression type (LZW is common for COGs)
+        "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
+    }
+
+    # Open the input file
+    with rasterio.open(input_file) as src:
+        # Copy the input file to a COG with updated options
+        copy(
+            src,
+            output_file,
+            driver="COG",
+            **cog_options
+        )
+
+    logger.info(f"COG saved to {output_file}")
+
+
+def batch_convert_to_cog(input_files, output_dir, max_workers=4):
+    """Parallelize the conversion of multiple files to COG."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for input_file in input_files:
+            output_file = output_dir / f"{Path(input_file).stem}_cog.tif"
+            futures.append(executor.submit(convert_to_cog, input_file, output_file))
+
+        # Wait for all tasks to complete
+        for future in futures:
+            future.result()
+
+
+
+
+
+def create_tiles(input_file, output_dir, tile_size=512):
+    """Split a large raster into smaller physical tiles."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cog_options = {
+        "BLOCKXSIZE": 1024,  # Internal tile size for COGs
+        "BLOCKYSIZE": 1024,
+        "TILED": True,
+        "COMPRESS": "LZW",  # Compression for COGs
+    }
+
+    with rasterio.open(input_file) as src:
+        width, height = src.width, src.height
+        for i in range(0, width, tile_size):
+            for j in range(0, height, tile_size):
+                # Define window for the tile
+                window = Window(i, j, tile_size, tile_size)
+                transform = src.window_transform(window)
+
+                # Read data and write to a new file
+                tile_file = output_dir / f"{input_file.stem}_tile_{i}_{j}.tif"
+                meta = src.meta.copy()
+                meta.update({
+                    "driver": "COG",  # Save directly as COG
+                    "height": min(tile_size, height - j),
+                    "width": min(tile_size, width - i),
+                    "transform": transform,
+                    **cog_options,  # Add COG-specific options
+                })
+
+                with rasterio.open(tile_file, "w", **meta) as dst:
+                    logger.info(f"Writing {tile_file}")
+                    dst.write(src.read(window=window))
+
+                    logger.info(f"Adding overviews to {tile_file}")
+                    # Add overviews
+                    overviews = [2, 4, 8]  # Define overview levels
+                    dst.build_overviews(overviews, Resampling.average)
+                    dst.update_tags(ns="rio_overview", resampling="average")
+                logger.info(f"Saved {tile_file}")
