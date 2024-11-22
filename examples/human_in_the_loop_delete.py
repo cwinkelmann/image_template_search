@@ -20,6 +20,9 @@ def retrieve_from_cvat(anno_key, dataset_name = "projection_comparison"):
 
 
 if __name__ == '__main__':
+
+    ## TODO add the config here
+
     ## The image for Andrea:
     base_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
     images_dir = base_path / "Snt_STJB01_10012023/template_images"
@@ -31,7 +34,7 @@ if __name__ == '__main__':
     projected_image_2_path = interm_path / "matched_template_San_STJB01_10012023_DJI_0068_Snt_STJB01to05_10012023_orthomosaic_DDeploy_cropped.jpg"
     annotations_file_path = interm_path / "combined_annotations.json"
 
-
+    # corrected labels after cvat
     corrected_annotations_file_path = interm_path / "methods_paper_labels_corrected.json"
 
 
@@ -191,7 +194,7 @@ if __name__ == '__main__':
         hA_corrected.images.append(image)
 
         # TODO plot these images
-
+        # ToDO correct titles
         ax_c = visualise_image(image_path=filepath, dpi=100, title="Corrected labels")
         ax_c = visualise_polygons(points=[x.centroid for x in image.labels],
                                   ax=ax_c, filename=interm_path / f"{Path(hasty_filename).stem}_corrected.jpg",
