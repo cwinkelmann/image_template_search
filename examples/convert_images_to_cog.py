@@ -5,13 +5,13 @@ from pathlib import Path
 
 from image_template_search.geospatial_transformations import convert_to_cog, batch_convert_to_cog
 
-input_files = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/.shortcut-targets-by-id/1u0tmSqWpyjE3etisjtWQ83r3cS2LEk_i/Manual Counting /Drone Deploy orthomosaics").rglob("Snt_STJB*.tif")
+input_files = Path("/home/christian/Downloads").glob("Snt_STJB*.tif")
 input_files = list(input_files)
 
 print(f"Found {len(input_files)} files")
 # output_dir = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/cog/")
-output_dir = Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/cog/")
-
+output_dir = Path("/home/christian/Downloads/cog/")
+output_dir.mkdir(exist_ok=True, parents=True)
 # input_files = [Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Scruz_SCPLF01_15012023.tif"),
 #                Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Scris_SRPB02to05_25012020.tif"),
 #                Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Scris_SRPB06_25012020.tif")]

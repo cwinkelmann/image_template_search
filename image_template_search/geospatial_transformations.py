@@ -153,11 +153,12 @@ def convert_to_cog(input_file, output_file):
     :return:
     """
     cog_options = {
-        "BLOCKXSIZE": 2048,  # Tile width
-        "BLOCKYSIZE": 2048,  # Tile height
-        "TILED": True,  # Enable tiling
+        "BLOCKXSIZE": 10000,  # Tile width
+        "BLOCKYSIZE": 10000,  # Tile height
+        "TILED": False,  # Enable tiling
         "COMPRESS": "LZW",  # Compression type (LZW is common for COGs)
-        "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
+        "COPY_SRC_OVERVIEWS": False,  # Copy overviews if they exist
+        "BIGTIFF": True  # Use BigTIFF format for large files
     }
 
     # Open the input file
