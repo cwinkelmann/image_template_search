@@ -153,11 +153,11 @@ def convert_to_cog(input_file, output_file):
     :return:
     """
     cog_options = {
-        "BLOCKXSIZE": 10000,  # Tile width
-        "BLOCKYSIZE": 10000,  # Tile height
-        "TILED": False,  # Enable tiling
-        "COMPRESS": "LZW",  # Compression type (LZW is common for COGs)
-        "COPY_SRC_OVERVIEWS": False,  # Copy overviews if they exist
+        "BLOCKXSIZE": 1024,  # Tile width
+        "BLOCKYSIZE": 1024,  # Tile height
+        "TILED": True,  # Enable tiling
+        "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
+        "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
         "BIGTIFF": True  # Use BigTIFF format for large files
     }
 
@@ -170,7 +170,6 @@ def convert_to_cog(input_file, output_file):
             driver="COG",
             **cog_options
         )
-
     logger.info(f"COG saved to {output_file}")
 
 
@@ -182,7 +181,7 @@ def batch_convert_to_cog(input_files, output_dir, max_workers=4):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
         for input_file in input_files:
-            output_file = output_dir / f"{Path(input_file).stem}_cog.tif"
+            output_file = output_dir / f"{Path(input_file).stem}_cog_pyramids.tif"
             futures.append(executor.submit(convert_to_cog, input_file, output_file))
 
         # Wait for all tasks to complete
