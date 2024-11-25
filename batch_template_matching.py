@@ -2,18 +2,19 @@ import typing
 
 from loguru import logger
 
-from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config
+from examples.review_annotations import debug_hasty_fiftyone
+from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config, \
+    BatchWorkflowConfiguration
 from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
 
 scenario = "Snt_STJB01"
 scenario = "Snt_STJB06"
 # scenario = "FCD01-02-03"
 # scenario = "FMO04_tracking"
+import fiftyone as fo
 
 from pathlib import Path
-from image_template_search.util.HastyAnnotationV2 import hA_from_file
-
-
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, HastyAnnotationV2
 
 
 def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
@@ -82,33 +83,32 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
     # This is one of the biggest orthomosaics we can find.
     #
 
-    if scenario == "FCD01-02-03":
+    if scenario == "FCD01_02_03":
         base_path = Path(
-            "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01-02-03")
+            "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01-02-03"
+        )
 
         image_url = "https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/a012b2fd-6250-4af7-8d93-51fcf36930bf?datasetId=581cdd49-61ad-4e35-9dff-c6847a4f2db0"
         drone_image_path = base_path / "template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
-        # orthomosaic_path =  base_path / "Metashape_FCD01-02-03-orthomosaic.tif" # Metashape
-        orthomosaic_path = base_path / "DroneDeploy_FCD010203_Orthomosaic.tif"  # Drone Deploy
+        annotations_file_path = base_path / "template_images/2024_11_13_labels_FCD01-02-03.json"
+
+        ## Orthomosaics
+        orthomosaic_paths = [
+            base_path / "DroneDeploy_FCD010203_Orthomosaic.tif",  # Drone Deploy
+            base_path / "Metashape_FCD01-02-03-orthomosaic.tif",  # Metashape
+            base_path / "Pix4D_FCD01-02-03-orthomosaic.tiff",  # Pix4D
+            base_path / "ODM_FCD01-02-03-orthophoto.tif",  # OpenDroneMap
+        ]
 
         # Intermediate data path
         interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
-
-        annotations_file_path = base_path / "template_images/2024_11_13_labels_FCD01-02-03.json"
 
         tile_base_path = interm_path / "tiles"
         cache_path = interm_path / "cache"
         output_path = interm_path / "output" / "FCD01-02-03"
 
         # buffer distance in meters around drone image to locate location in orthomosaic
-        buffer_distance = 30
-
-        hA = hA_from_file(file_path=annotations_file_path)
-        hA.images = [i for i in hA.images if i.image_name in [drone_image_path.name]]
-        assert len(hA.images) == 1, "There should be only a single image left"
-        drone_image_label = hA.images[0]
-
-        drone_image_label.image_name
+        buffer_distance = 60
 
     if scenario == "Snt_STJB06":
         base_path = Path(
@@ -124,7 +124,7 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
                              #base_path / "Snt_STJB06_12012023_orthomosaic_Agisoft.tif",  # Agisoft
                              #base_path / "Snt_STJB06_10012023_orthomosaic_Agisoft_deghost.tif",
                              # Agisoft using the deghosting
-                             #base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D.tiff",  # Pix4D
+                             base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D.tiff",  # Pix4D
                              #base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D_deghost.tiff",  # Pix4D with deghosting
                              base_path / "Snt_STJB06_12012023_orthomosaic_ODM.tif",  # Open Dronemap
                              ]
@@ -163,58 +163,94 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
 if __name__ == "__main__":
 
     datasets = []
+    hA_projection_images = []
+    projection_images = []
+    scenario = "Snt_STJB06"
+    scenario = "FCD01_02_03"
+    dataset_name = f"{scenario}"
 
-    for c in get_config(scenario="Snt_STJB06"):
 
-        ## ONLY DELETE THIS IF YOU WANT TO START FROM SCRATCH
-        # fo.delete_dataset(dataset_name)
+    try:
+        fo.delete_dataset(dataset_name)
+    except:
+        logger.warning(f"Dataset {dataset_name} does not exist yet")
+    bwc = BatchWorkflowConfiguration(base_path=Path("/Users/christian/PycharmProjects/hnee/image_template_search/data"))
+
+    for c in get_config(scenario=scenario):
+        bwc.workflow_configurations.append(c)
+
+    for c in bwc.workflow_configurations:
+        # if the drone image is not part of the annotations, we need to add it
+        hA_drone_image = hA_from_file(file_path=c.annotations_file_path)
+        hA_drone_images = [i for i in hA_drone_image.images if i.image_name in [c.drone_image_path.name]]
+        drone_image_path = c.drone_image_path
+        if not drone_image_path in projection_images:
+            hA_projection_images.extend(hA_drone_images)
+            projection_images.append(drone_image_path)
 
         file_path = c.base_path / f"workflow_config_{c.orthomosaic_path.stem}.yaml"
-
 
         persist_file(config=c, file_path=file_path )
 
         cl = load_yaml_config(yaml_file_path=file_path, cls=WorkflowConfiguration)
 
-        dataset = workflow_project_single_image_drone_and_annotations(cl)
 
-        datasets.append(dataset)
+        hA_projection, images_set = workflow_project_single_image_drone_and_annotations(cl)
 
-        ## Launch FiftyOne inspection app
-        import fiftyone as fo
-        session = fo.launch_app(dataset, port=5151)
-        session.wait()
+        hA_projection_images.extend(hA_projection.images)
+        projection_images.extend(images_set)
 
-        # sample_id = dataset.first().id
-        # view = dataset.select(sample_id)
+    hA_drone_image.images = hA_projection_images
+    file_path = bwc.base_path / f"combined_annotations_{dataset_name}.json"
+    HastyAnnotationV2.save(hA_drone_image, file_path=file_path)
+    bwc.combined_annotations = file_path
 
-        for i, s in enumerate(dataset):
-            logger.info(f"sample {i} of the dataset")
+    persist_file(config=bwc, file_path=bwc.base_path / f"batch_workflow_config_{dataset_name}.yaml")
 
-        # Step 3: Send samples to CVAT
+    # create dot annotations
+    dataset = debug_hasty_fiftyone(
+        annotated_images=hA_projection_images,
+        images_set=projection_images,
+        dataset_name=dataset_name,
+        type="points",
+    )
 
-        # A unique identifier for this run
-        # anno_key = f"cvat_basic_recipe_{orthomosaic_path.stem}"
-        anno_key = dataset_name = "debugging_merge_multiple_tasks"
+    datasets.append(dataset)
 
-        dataset.annotate(
-            anno_key,
-            # Using a organization requires a team account for 33USD
-            # project_name = "Orthomosaic_quality_control",
-            # organization=organization
-            label_field="ground_truth_points",
-            attributes=["iscrowd"],
-            launch_editor=True,
-        )
-        print(dataset.get_annotation_info(anno_key))
+    ## Launch FiftyOne inspection app
+    import fiftyone as fo
+    # session = fo.launch_app(dataset, port=5151)
+    # session.wait()
+
+    # sample_id = dataset.first().id
+    # view = dataset.select(sample_id)
+
+    for i, s in enumerate(dataset):
+        logger.info(f"sample {i} of the dataset")
+
+    # Step 3: Send samples to CVAT
+
+    # A unique identifier for this run
+    # anno_key = f"cvat_basic_recipe_{orthomosaic_path.stem}"
+
+    dataset.annotate(
+        anno_key=dataset_name,
+        # Using a organization requires a team account for 33USD
+        # project_name = "Orthomosaic_quality_control",
+        # organization=organization
+        label_field="ground_truth_points",
+        attributes=["iscrowd"],
+        launch_editor=True,
+    )
+    print(dataset.get_annotation_info(dataset_name))
 
 
 
-        # #### Step 7 - change the annotations in CVAT
-        # Review and update the labels on cvat.ai
-        #
-        #
+    # #### Step 7 - change the annotations in CVAT
+    # Review and update the labels on cvat.ai
+    #
+    #
 
-        # #### Step 8 - download the annotations again
-        # TODO
-        # Look into the human_in_the_loop_delete script
+    # #### Step 8 - download the annotations again
+    # TODO
+    # Look into the human_in_the_loop_delete script

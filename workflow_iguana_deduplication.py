@@ -8,6 +8,8 @@ os.environ["FIFTYONE_CVAT_PASSWORD"] = "Q6YRN7Z8Z4f5X4S"
 
 from PIL import Image
 
+from conf.config_dataclass import CacheConfig
+
 Image.MAX_IMAGE_PIXELS = 5223651122
 
 from dataclasses import asdict
@@ -76,14 +78,15 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     wrconf = WorkflowReportConfiguration(**asdict(c))
 
     visualise_image(
-        image_path=c.drone_image_path, show=True, dpi=75, title="Drone Image"
+        image_path=c.drone_image_path, show=CacheConfig.visualise_matching, dpi=75, title="Drone Image",
+        output_file_name=c.output_path / f"{c.drone_image_path.stem}_drone_image.jpg"
     )
 
-    orthomosaic_proj_path = c.interm_path / f"{c.orthomosaic_path.stem}_proj.tif"
+    orthomosaic_proj_path = c.output_path / f"{c.orthomosaic_path.stem}_proj.tif"
     wrconf.orthomosaic_proj_path = orthomosaic_proj_path
 
     # clipped orthomosaic
-    orthomosaic_crop_path = c.interm_path / f"{c.orthomosaic_path.stem}_cropped.tif"
+    orthomosaic_crop_path = c.output_path / f"{c.orthomosaic_path.stem}_cropped.tif"
     wrconf.orthomosaic_crop_path = orthomosaic_crop_path
 
     # project_orthomsaic(orthomosaic_path, orthomosaic_proj_path, target_crs="EPSG:4326")
@@ -125,9 +128,8 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
                 buffer, source_crs=target_crs.__str__(), target_crs="EPSG:4326"
             )
 
-    # TODO create the buffer as EPSG:4326 if necessary
     buffer_geojson_path = (
-        c.interm_path / f"{c.drone_image_path.stem}_{c.buffer_distance}_buffer.geojson"
+        c.output_path / f"{c.drone_image_path.stem}_{c.buffer_distance}_buffer.geojson"
     )
     save_polygon_as_geojson(buffer, buffer_geojson_path, EPSG_code=epsg)
     wrconf.buffer_geojson_path = buffer_geojson_path
@@ -144,9 +146,10 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
 
     visualise_image(
         image_path=orthomosaic_crop_path,
-        show=True,
+        show=CacheConfig.visualise_matching,
         dpi=75,
         title="Cropped and projected Mosaic image",
+        output_file_name=c.output_path / f"{c.orthomosaic_path.stem}_cropped_by_location.jpg"
     )
 
     # #### Step 2 - cutout
@@ -155,49 +158,56 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     # Using OpenCV
     # This is memory efficient and not as scale dependent as the LightGlue based matching. But it is often inaccurate especialle with unsharp images.
 
-    ipf = ImagePatchFinderCV(
-        template_path=c.drone_image_path, large_image_path=orthomosaic_crop_path
-    )
-
-    ipf.find_patch()
-    ax_i = visualise_image(
-        image_path=ipf.large_image_path,
-        show=False,
-        dpi=150,
-        title="Project Orthomosaic",
-    )
-    visualise_polygons(
-        polygons=[ipf.proj_template_polygon],
-        ax=ax_i,
-        show=True,
-        color="red",
-        linewidth=4,
-    )
+    # ipf = ImagePatchFinderCV(
+    #     template_path=c.drone_image_path, large_image_path=orthomosaic_crop_path
+    # )
+    #
+    # ipf.find_patch()
+    # ax_i = visualise_image(
+    #     image_path=ipf.large_image_path,
+    #     show=False,
+    #     dpi=150,
+    #     title="Project Orthomosaic",
+    # )
+    # visualise_polygons(
+    #     polygons=[ipf.proj_template_polygon],
+    #     ax=ax_i,
+    #     show=CacheConfig.visualise_matching,
+    #     color="red",
+    #     linewidth=4,
+    # )
 
     # Use the the LightGLue Based Matching instead
 
-    ipf = ImagePatchFinderLG(
+    ipf_lg = ImagePatchFinderLG(
         template_path=c.drone_image_path, large_image_path=orthomosaic_crop_path
     )
 
-    ipf.find_patch()
-    ax_i = visualise_image(image_path=ipf.large_image_path, show=False, dpi=150)
-    visualise_polygons(
-        polygons=[ipf.proj_template_polygon],
-        ax=ax_i,
-        show=True,
-        color="red",
-        linewidth=4,
-    )
+    ipf_lg.find_patch()
+    try:
+        ax_i = visualise_image(image_path=ipf_lg.large_image_path, show=False, dpi=150)
+
+        visualise_polygons(
+            polygons=[ipf_lg.proj_template_polygon],
+            ax=ax_i,
+            show=CacheConfig.visualise_matching,
+            color="red",
+            linewidth=4,
+            filename=c.output_path / f"{c.orthomosaic_path.stem}_template.jpg"
+        )
+    except Exception as e:
+        logger.error(f"Error visualising: {e}")
+        if ipf_lg.proj_template_polygon is None:
+            logger.error("template not found")
 
     # #### Step 3 - Warp the orthomosaic to the template extent
 
     projected_image_2_path = project_image(
-        ipf.M,
+        ipf_lg.M,
         template_path=c.drone_image_path,
         large_image_path=orthomosaic_crop_path,
         output_path=c.output_path,
-        visualise=True,
+        visualise=CacheConfig.visualise_matching,
     )
 
     logger.info(f"projected_image_2_path: {projected_image_2_path}")
@@ -224,7 +234,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
         ax=ax_p,
         linewidth=4,
         color="red",
-        show=True,
+        show=CacheConfig.visualise_matching,
     )
 
     logger.info(f"projected_labels: {projected_labels}")
@@ -254,10 +264,8 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     )
 
     projected_annotation_path = c.output_path / f"template_annotations_projected.json"
-    combined_annotations_file_path = c.output_path / f"combined_annotations.json"
 
     wrconf.projected_annotation_path = projected_annotation_path
-    wrconf.combined_annotations_file_path = combined_annotations_file_path
 
     with open(projected_annotation_path, "w") as json_file:
         json_file.write(hA_projected.model_dump_json())
@@ -272,7 +280,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
 
     # load hasty annotations
     hA = hA_from_file(file_path=c.annotations_file_path)
-    hA_images = [i for i in hA.images if i.image_name in [c.drone_image_path.name]]
+    # hA_images = [i for i in hA.images if i.image_name in [c.drone_image_path.name]]
 
     hA_projected = hA_from_file(file_path=projected_annotation_path)
     hA_projected_images = [
@@ -281,14 +289,15 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
 
     logger.info(f"annotations_file_path: {c.annotations_file_path}")
 
-    hA.images = hA_images + hA_projected_images
-    images_set = [projected_image_2_path, c.drone_image_path]
-    assert len(hA.images) == 2, "There should be two images in there"
+    # hA.images = hA_images + hA_projected_images
+    hA.images = hA_projected_images
+    # images_set = [projected_image_2_path, c.drone_image_path]
+    images_set = [projected_image_2_path]
+    assert len(hA.images) == 1, "There should be one image in there"
 
     dataset_name = (
         f"projection_comparison_{c.orthomosaic_path.stem}__{c.drone_image_path.stem}"
     )
-    hA.save(combined_annotations_file_path)
     wrconf.dataset_name = dataset_name
 
     shutil.copy(c.drone_image_path, c.output_path)
@@ -300,12 +309,6 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
         / f"workflow_report_{c.orthomosaic_path.stem}.yaml",
         config=wrconf,
     )
-    # create dot annotations
-    dataset = debug_hasty_fiftyone(
-        annotated_images=hA.images,
-        images_set=images_set,
-        dataset_name=dataset_name,
-        type="points",
-    )
 
-    return dataset
+
+    return hA, images_set

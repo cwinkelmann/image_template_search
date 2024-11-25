@@ -149,7 +149,7 @@ def debug_hasty_fiftyone(
 
 
         hA_gt_sample = [i for i in annotated_images if i.image_name == image_path.name]
-        assert len(hA_gt_sample) == 1, "There should be one single image left"
+        assert len(hA_gt_sample) == 1, f"There should be one single image left, but {len(hA_gt_sample)} are left."
 
         hA_image = hA_gt_sample[0]
         keypoints = _create_keypoints_s(hA_image=hA_image)
@@ -208,7 +208,7 @@ if __name__ == '__main__':
         pass
 
     # create dot annotations
-    dataset = debug_hasty_fiftyone(hA_dets=hA.images,
+    dataset = debug_hasty_fiftyone(
                                    annotated_images=hA.images,
                                    images_set=images_set,
                                    dataset_name=dataset_name,

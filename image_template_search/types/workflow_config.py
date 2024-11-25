@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import List
 import yaml
@@ -71,12 +71,15 @@ class WorkflowConfiguration:
     buffer_distance: int
 
 
+@dataclass
+class BatchWorkflowConfiguration:
+    base_path: Path
+    workflow_configurations: List[Path] = field(default_factory=list)
+
 class WorkflowReportConfiguration(WorkflowConfiguration):
-    combined_annotations_file_path: Path
     buffer_geojson_path: Path
     orthomosaic_proj_path: Path
     orthomosaic_crop_path: Path
     projected_image_2_path: Path
     projected_annotation_path: Path
-    combined_annotations_file_path: Path
     dataset_name: str

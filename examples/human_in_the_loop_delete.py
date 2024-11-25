@@ -10,6 +10,8 @@ import shapely
 from loguru import logger
 from sympy.core.expr import unchanged
 
+from image_template_search.types.workflow_config import load_yaml_config, WorkflowReportConfiguration, \
+    BatchWorkflowConfiguration
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, Keypoint
 from image_template_search.util.util import visualise_image, visualise_polygons
 
@@ -19,12 +21,25 @@ def retrieve_from_cvat(anno_key, dataset_name = "projection_comparison"):
     return results, view
 
 
+def get_workflow_reports(base_path: Path):
+
+
+
 if __name__ == '__main__':
 
     ## TODO add the config here
 
+    batched_workflow_report = load_yaml_config(yaml_file_path=Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/batch_workflow_config_FCD01_02_03.yaml"), cls=BatchWorkflowConfiguration)
+
+    for b in batched_workflow_report.workflow_configurations:
+        base_path = batched_workflow_report.base_path
+
+
     ## The image for Andrea:
     base_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
+
+    reports = get_workflow_reports(base_path)
+
     images_dir = base_path / "Snt_STJB01_10012023/template_images"
     interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data") / "output" / "Snt_STJB01_10012023"
 

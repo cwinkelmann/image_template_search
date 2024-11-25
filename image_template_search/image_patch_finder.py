@@ -131,7 +131,7 @@ def project_image(M, template_path, large_image_path, output_path,
         plt.imshow(rotated_cropped_image_bbox)
         # plt.axis('off')  # Hide axis
         plt.show()
-    rotated_cropped_image_bbox_path = output_path / f"matched_template_{template_path.stem}_{large_image_path.stem}.jpg"
+    rotated_cropped_image_bbox_path = output_path / f"mt_{template_path.stem}_{large_image_path.stem}.jpg"
     cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
 
     return rotated_cropped_image_bbox_path

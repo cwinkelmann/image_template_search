@@ -738,7 +738,7 @@ class ImagePatchFinderLG(object):
 
     def find_patch(self,
                    output_path=Path("./output"),
-                   similarity_threshold=0.1):
+                   similarity_threshold=0.05):
         """
         Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
         TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
@@ -751,11 +751,11 @@ class ImagePatchFinderLG(object):
         normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path,
                                                           Path(self.large_image_path))
 
-        if normalised_sim < similarity_threshold or len(m_kpts0) < 10 or len(m_kpts1) < 10:
+        if len(m_kpts0) < 10 or len(m_kpts1) < 10:
             logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
             logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
 
-            return False
+            raise ValueError(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
 
         if not isinstance(output_path, Path):
             output_path = Path(output_path)

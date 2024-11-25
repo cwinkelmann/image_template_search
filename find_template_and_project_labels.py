@@ -64,7 +64,8 @@ def single_stage_template_matching_projection(template_image_path: Path, large_i
     ax_image = visualise_image(image_path=large_image_path, show=False, title="Orthomosaic", dpi=75)
     visualise_polygons([ipf_t.proj_template_polygon],
                        labels=["template extent"],
-                       show=CacheConfig.visualise_info, ax=ax_image, color="red", linewidth=4.5)
+                       show=CacheConfig.visualise_info,
+                       ax=ax_image, color="red", linewidth=4.5)
 
 
 
