@@ -129,33 +129,26 @@ def _create_boxes_s(hA_image: AnnotatedImage) -> typing.List[fo.Detection]:
 def debug_hasty_fiftyone(
         images_set = List[Path],
         # images_dir: Path,
-        hA_gt: List[AnnotatedImage] = None,
-        hA_dets: List[AnnotatedImage] = None,
+        annotated_images: List[AnnotatedImage] = None,
         dataset_name="projection_comparison",
         type="points"):
     """
     Display these annotations in Fifty One
     :return:
     """
-    # dataset = fo.Dataset.from_images_dir(images_dir=images_dir)
-    # TODO ensure detections and gt are the same set
-
-    # images_set: list[Path] = [images_dir / i.image_name for i in hA_gt]
-    # Specify a name for the dataset
-
 
     # Create an empty dataset
     dataset = fo.Dataset(dataset_name)
     dataset.persistent = True
     # fo.list_datasets()
 
-    # dataset = fo.load_dataset(dataset_name) # loading a bad idea becase the single source of truth is the hasty annotations
+    # dataset = fo.load_dataset(dataset_name) # loading a bad idea because the single source of truth is the hasty annotations
     samples = []
 
     for image_path in images_set:
 
 
-        hA_gt_sample = [i for i in hA_gt if i.image_name == image_path.name]
+        hA_gt_sample = [i for i in annotated_images if i.image_name == image_path.name]
         assert len(hA_gt_sample) == 1, "There should be one single image left"
 
         hA_image = hA_gt_sample[0]
@@ -216,7 +209,7 @@ if __name__ == '__main__':
 
     # create dot annotations
     dataset = debug_hasty_fiftyone(hA_dets=hA.images,
-                                   hA_gt=hA.images,
+                                   annotated_images=hA.images,
                                    images_set=images_set,
                                    dataset_name=dataset_name,
                                    type="points")

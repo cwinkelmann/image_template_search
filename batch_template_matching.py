@@ -1,5 +1,7 @@
 import typing
 
+from loguru import logger
+
 from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config
 from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
 
@@ -160,7 +162,13 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
 
 if __name__ == "__main__":
 
+    datasets = []
+
     for c in get_config(scenario="Snt_STJB06"):
+
+        ## ONLY DELETE THIS IF YOU WANT TO START FROM SCRATCH
+        # fo.delete_dataset(dataset_name)
+
         file_path = c.base_path / f"workflow_config_{c.orthomosaic_path.stem}.yaml"
 
 
@@ -168,4 +176,45 @@ if __name__ == "__main__":
 
         cl = load_yaml_config(yaml_file_path=file_path, cls=WorkflowConfiguration)
 
-        workflow_project_single_image_drone_and_annotations(cl)
+        dataset = workflow_project_single_image_drone_and_annotations(cl)
+
+        datasets.append(dataset)
+
+        ## Launch FiftyOne inspection app
+        import fiftyone as fo
+        session = fo.launch_app(dataset, port=5151)
+        session.wait()
+
+        # sample_id = dataset.first().id
+        # view = dataset.select(sample_id)
+
+        for i, s in enumerate(dataset):
+            logger.info(f"sample {i} of the dataset")
+
+        # Step 3: Send samples to CVAT
+
+        # A unique identifier for this run
+        # anno_key = f"cvat_basic_recipe_{orthomosaic_path.stem}"
+        anno_key = dataset_name = "debugging_merge_multiple_tasks"
+
+        dataset.annotate(
+            anno_key,
+            # Using a organization requires a team account for 33USD
+            # project_name = "Orthomosaic_quality_control",
+            # organization=organization
+            label_field="ground_truth_points",
+            attributes=["iscrowd"],
+            launch_editor=True,
+        )
+        print(dataset.get_annotation_info(anno_key))
+
+
+
+        # #### Step 7 - change the annotations in CVAT
+        # Review and update the labels on cvat.ai
+        #
+        #
+
+        # #### Step 8 - download the annotations again
+        # TODO
+        # Look into the human_in_the_loop_delete script
