@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import yaml
 
 # Define how to represent Path objects in YAML
@@ -38,9 +38,8 @@ def load_yaml_config(yaml_file_path: Path, cls: dataclass):
         data= yaml.load(file, Loader=PathLoader)
 
     # Convert string paths back to Path objects
-    data = {k: Path(v) if k.endswith('_path') or k == 'base_path' else v for k, v in data.items()}
+    data = {k: Path(v) if k.endswith('_path') and v is not None else v for k, v in data.items()}
 
-    # Create WorkflowConfiguration instance
     return cls(**data)
 
 # Convert data to a dictionary and ensure all Path objects are converted to strings
@@ -71,15 +70,52 @@ class WorkflowConfiguration:
     buffer_distance: int
 
 
+
+@dataclass
+class WorkflowReportConfiguration(WorkflowConfiguration):
+    buffer_geojson_path: Optional[Path] = field(default=None)
+    orthomosaic_proj_path: Optional[Path] = field(default=None)
+    orthomosaic_crop_path: Optional[Path] = field(default=None)
+    projected_image_2_path: Optional[Path] = field(default=None)
+    projected_annotation_file_path: Optional[Path] = field(default=None)
+
+
 @dataclass
 class BatchWorkflowConfiguration:
-    base_path: Path
-    workflow_configurations: List[Path] = field(default_factory=list)
+    """ Configuration for the workflow of matching a drone image to an orthomosaic, followed by processing labels.
 
-class WorkflowReportConfiguration(WorkflowConfiguration):
-    buffer_geojson_path: Path
-    orthomosaic_proj_path: Path
-    orthomosaic_crop_path: Path
-    projected_image_2_path: Path
-    projected_annotation_path: Path
+    Attributes:
+        base_path (Path): The base directory where all workflow-related files are located.
+        dataset_name (str): The name of the dataset being processed.
+        workflow_configurations (List[WorkflowConfiguration]): A list of configurations for individual workflows.
+        workflow_report_configurations (List[WorkflowReportConfiguration]): A list of configurations for generating reports from workflows.
+        combined_annotations_path (Path): Path to the file containing combined annotations from multiple workflows.
+        corrected_annotations_file_path (Optional[Path]): Path to the file containing manually corrected annotations.
+            Defaults to None if no corrections have been made.
+        stats_path (Optional[Path]): Path to the file where workflow statistics are saved. Defaults to None.
+    """
+    base_path: Path
     dataset_name: str
+    workflow_configurations: List[WorkflowConfiguration] = field(default_factory=list)
+
+
+@dataclass
+class BatchWorkflowReportConfiguration(BatchWorkflowConfiguration):
+    """ Configuration for the workflow of matching a drone image to an orthomosaic, followed by processing labels.
+
+    Attributes:
+        base_path (Path): The base directory where all workflow-related files are located.
+        dataset_name (str): The name of the dataset being processed.
+        workflow_configurations (List[WorkflowConfiguration]): A list of configurations for individual workflows.
+        workflow_report_configurations (List[WorkflowReportConfiguration]): A list of configurations for generating reports from workflows.
+        combined_annotations_path (Path): Path to the file containing combined annotations from multiple workflows.
+        corrected_annotations_file_path (Optional[Path]): Path to the file containing manually corrected annotations.
+            Defaults to None if no corrections have been made.
+        stats_path (Optional[Path]): Path to the file where workflow statistics are saved. Defaults to None.
+    """
+
+    workflow_report_configurations: List[WorkflowReportConfiguration] = field(default_factory=list)
+    combined_annotations_path: Optional[Path] = field(default=None)
+    corrected_annotations_file_path: Optional[Path] = field(default=None)
+    stats_path: Optional[Path] = field(default=None)
+

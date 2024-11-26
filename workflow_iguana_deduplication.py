@@ -237,7 +237,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
         show=CacheConfig.visualise_matching,
     )
 
-    logger.info(f"projected_labels: {projected_labels}")
+    logger.info(f"projected_labels: {len(projected_labels)}")
 
     # #### Step 5 - create an Annotation for later use
     #
@@ -271,6 +271,8 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
         json_file.write(hA_projected.model_dump_json())
         logger.info(f"Wrote annotations to: {projected_annotation_path}")
 
+    wrconf.projected_annotation_path = projected_annotation_path
+
     # If the Orthomosaic is perfect and incorporated the drone image completely the annotation should match the single image.
     # Due to distortions or moved animals either animals will be missing, duplicated or simply somewhere else.
     #
@@ -295,14 +297,12 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     images_set = [projected_image_2_path]
     assert len(hA.images) == 1, "There should be one image in there"
 
-    dataset_name = (
-        f"projection_comparison_{c.orthomosaic_path.stem}__{c.drone_image_path.stem}"
-    )
-    wrconf.dataset_name = dataset_name
+
+    hA.save(projected_annotation_path)
+    wrconf.projected_annotation_file_path = projected_annotation_path
+    wrconf.projected_image_2_path = projected_image_2_path
 
     shutil.copy(c.drone_image_path, c.output_path)
-
-    # ## Delete the dataset if it exists
 
     persist_file(
         file_path=wrconf.output_path
@@ -310,5 +310,4 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
         config=wrconf,
     )
 
-
-    return hA, images_set
+    return hA, images_set, wrconf

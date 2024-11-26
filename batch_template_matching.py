@@ -1,15 +1,17 @@
 import typing
+from dataclasses import asdict
 
 from loguru import logger
 
 from examples.review_annotations import debug_hasty_fiftyone
 from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config, \
-    BatchWorkflowConfiguration
+    BatchWorkflowConfiguration, BatchWorkflowReportConfiguration
 from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
+from datetime import datetime
 
 scenario = "Snt_STJB01"
 scenario = "Snt_STJB06"
-# scenario = "FCD01-02-03"
+# scenario = "FCD01_02_03"
 # scenario = "FMO04_tracking"
 import fiftyone as fo
 
@@ -79,13 +81,13 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
 
         drone_image_label.image_name
 
-    # FCD01-02-03 Scenario
+    # FCD01_02_03 Scenario
     # This is one of the biggest orthomosaics we can find.
     #
 
-    if scenario == "FCD01_02_03":
+    if scenario == "FCD01_02_03_DJI_0366":
         base_path = Path(
-            "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01-02-03"
+            "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03"
         )
 
         image_url = "https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/a012b2fd-6250-4af7-8d93-51fcf36930bf?datasetId=581cdd49-61ad-4e35-9dff-c6847a4f2db0"
@@ -105,7 +107,7 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
 
         tile_base_path = interm_path / "tiles"
         cache_path = interm_path / "cache"
-        output_path = interm_path / "output" / "FCD01-02-03"
+        output_path = interm_path / "output" / "FCD01_02_03_DJI_0366"
 
         # buffer distance in meters around drone image to locate location in orthomosaic
         buffer_distance = 60
@@ -162,22 +164,36 @@ def get_config(scenario: str)-> typing.List[WorkflowConfiguration]:
 
 if __name__ == "__main__":
 
+    scenario = "Snt_STJB06"
+    scenario = "FCD01_02_03_DJI_0366"
+
+    # Get the current date and time
+    now = datetime.now()
+
+    # Format the date, hours, and minutes into a string
+    formatted_string = now.strftime("%Y-%m-%d %H:%M")
+
+
+
+    dataset_name = f"{scenario}"
+
     datasets = []
     hA_projection_images = []
     projection_images = []
-    scenario = "Snt_STJB06"
-    scenario = "FCD01_02_03"
-    dataset_name = f"{scenario}"
 
+    # try:
+    #     fo.delete_dataset(dataset_name)
+    # except:
+    #     logger.warning(f"Dataset {dataset_name} does not exist yet")
 
-    try:
-        fo.delete_dataset(dataset_name)
-    except:
-        logger.warning(f"Dataset {dataset_name} does not exist yet")
-    bwc = BatchWorkflowConfiguration(base_path=Path("/Users/christian/PycharmProjects/hnee/image_template_search/data"))
+    bwc = BatchWorkflowConfiguration(
+        base_path=Path(f"/Users/christian/PycharmProjects/hnee/image_template_search/data/output/{dataset_name}"),
+                                                    dataset_name=dataset_name)
 
     for c in get_config(scenario=scenario):
         bwc.workflow_configurations.append(c)
+
+    bwrc = BatchWorkflowReportConfiguration(**asdict(bwc))
 
     for c in bwc.workflow_configurations:
         # if the drone image is not part of the annotations, we need to add it
@@ -195,17 +211,21 @@ if __name__ == "__main__":
         cl = load_yaml_config(yaml_file_path=file_path, cls=WorkflowConfiguration)
 
 
-        hA_projection, images_set = workflow_project_single_image_drone_and_annotations(cl)
+        hA_projection, images_set, report = workflow_project_single_image_drone_and_annotations(cl)
 
         hA_projection_images.extend(hA_projection.images)
         projection_images.extend(images_set)
 
+        bwrc.workflow_report_configurations.append(report)
+
+
     hA_drone_image.images = hA_projection_images
     file_path = bwc.base_path / f"combined_annotations_{dataset_name}.json"
     HastyAnnotationV2.save(hA_drone_image, file_path=file_path)
-    bwc.combined_annotations = file_path
+    bwrc.combined_annotations_path = file_path
 
     persist_file(config=bwc, file_path=bwc.base_path / f"batch_workflow_config_{dataset_name}.yaml")
+    persist_file(config=bwrc, file_path=bwc.base_path / f"batch_workflow_report_config_{dataset_name}.yaml")
 
     # create dot annotations
     dataset = debug_hasty_fiftyone(

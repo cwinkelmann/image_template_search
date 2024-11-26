@@ -282,7 +282,7 @@ def get_similarity(template_image: Path,
     # get matched keypoints only
     m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
-    # TODO visualise the data if necessary
+
     if CacheConfig.visualise_matching:
         ## Display the matches
         image0 = load_image(template_image)
@@ -429,13 +429,14 @@ def find_rotation_gen_kornia(m_kpts0: np.ndarray,
                       m_kpts1: np.ndarray,
                       image_name: typing.Union[str, Path]) -> (np.ndarray, np.ndarray, shapely.Polygon):
     """
-    Find the footprint of the template in the image using kornia for homography.
-
+    Find the footprint of the template in the image using kornia for homography
+    WARNING! on a ARM (M1,M2,... ) macbook this consumes a lot of memory
     :param m_kpts0: Matching keypoints in the template image.
     :param m_kpts1: Matching keypoints in the target image.
     :param image_name: Path to the target image.
     :return: Homography matrix, mask of inliers, and the footprint polygon.
     """
+    logger.warning("on a ARM (M1,M2,... ) macbook this consumes a lot of memory and is not practical for large images")
     # Convert image path if necessary
     if isinstance(image_name, str):
         image_name = Path(image_name)

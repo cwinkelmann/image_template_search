@@ -60,24 +60,24 @@ class LabelClass(BaseModel):
 class Keypoint(BaseModel):
     x: int
     y: int
-    id: str = Field(default=str(uuid.uuid4()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     norder: int = Field(default=0)
     visible: bool = Field(True)
-    created_by: Optional[str] = Field(default=str(uuid.uuid4()))
-    updated_by: Optional[str] = Field(default=str(uuid.uuid4()))
+    created_by: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
+    updated_by: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     create_date: Optional[datetime] = Field(default=datetime.now())
     update_date: Optional[datetime] = Field(default=datetime.now())
     keypoint_class_id: str = Field(alias='keypoint_class_id')
 
 
 class ImageLabel(BaseModel):
-    id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='id')
+    id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='id')
     class_name: str = Field(alias='class_name')
     bbox: Optional[List[int]] = Field(None, alias='bbox')
     polygon: Optional[List[List[int]]] = Field(default=None)  # A list of points that make up the polygon
     mask: Optional[List[int]] = Field(default=[])
     z_index: Optional[int] = 0
-    attributes: dict = {}
+    attributes: dict = Field(default_factory=dict)
     keypoints: Optional[List[Keypoint]] = None
 
     # incenter: Optional[List[int]] = None # The point which is either the centroid or the nearest point to the centroid that is withing the shape
@@ -153,14 +153,14 @@ class ImageLabel(BaseModel):
 
 
 class AnnotatedImage(BaseModel):
-    image_id: typing.Union[str, int] = Field(default=str(uuid.uuid4()), alias='image_id')
+    image_id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='image_id')
     image_name: str = Field(alias='image_name', description="Name of the image file")
     dataset_name: Optional[str] = Field(default=None, alias='dataset_name')
     ds_image_name: Optional[str] = Field(default=None)
     width: int = Field()
     height: int = Field()
     image_status: Optional[str] = "Done"
-    tags: Optional[List[str]] = []
+    tags: Optional[List[str]] = Field(default=list(), alias='tags')
     labels: List[ImageLabel]
     image_mode: Optional[str] = None
 
@@ -222,7 +222,7 @@ class HastyAnnotationV2_flat(BaseModel):
     export_date: datetime
     label_classes: List[LabelClass]
 
-    image_id: str | int = Field(default=str(uuid.uuid4()), alias='image_id')
+    image_id: str | int = Field(default_factory=lambda: str(uuid.uuid4()), alias='image_id')
     image_name: str
     dataset_name: str
     ds_image_name: Optional[str] = None
@@ -237,7 +237,7 @@ class HastyAnnotationV2_flat(BaseModel):
     label_id: str
     class_name: str
     bbox: Optional[List[int]] = Field(None)
-    mask: Optional[List[int]] = []
+    mask: Optional[List[int]] = Field(default_factory=list)
     z_index: int
     ID: Optional[str] = None
 
