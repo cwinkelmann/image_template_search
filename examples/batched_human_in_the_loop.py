@@ -9,7 +9,6 @@ import fiftyone as fo
 import pandas as pd
 import shapely
 from loguru import logger
-from sympy.core.expr import unchanged
 
 from image_template_search.types.workflow_config import (
     load_yaml_config,
@@ -22,11 +21,6 @@ from image_template_search.util.HastyAnnotationV2 import (
     AnnotatedImage,
 )
 from image_template_search.util.util import visualise_image, visualise_polygons
-
-
-def retrieve_from_cvat(anno_key, dataset_name="projection_comparison"):
-
-    return results, view
 
 
 if __name__ == "__main__":
@@ -90,7 +84,6 @@ if __name__ == "__main__":
     cleanup = False
 
     # create dot annotations
-    # results, view = retrieve_from_cvat(anno_key=anno_key, dataset_name = dataset_name)
 
     # Step 5: Merge annotations back into FiftyOne dataset
 
@@ -176,6 +169,8 @@ if __name__ == "__main__":
         else:
             logger.info(f"Sample {sample.id} has no ground_truth_boxes")
 
+        # TODO if the label was changed this has to be reflected in the attributes
+        # TODO if the label was changed this has to be reflected in the stats
         if hasattr(sample, "ground_truth_points"):
             for kp in sample.ground_truth_points.keypoints:
                 # iterate over the keypoints
@@ -229,13 +224,18 @@ if __name__ == "__main__":
         else:
             logger.info(f"Sample {sample.id} has no ground_truth_points")
         stats_row["filename"] = hasty_filename
-        stats_row["updated_labels"] = len(updated_labels)
-        stats_row["new_labels"] = len(new_labels)
-        stats_row["unchanged_labels"] = len(unchanged_labels)
+
+        updated_labels_ig = [il for il in updated_labels if il.class_name == "iguana"]
+        new_labels_ig = [il for il in new_labels if il.class_name == "iguana"]
+        unchanged_labels_ig = [il for il in unchanged_labels if il.class_name == "iguana"]
+
+        stats_row["updated_labels"] = len(updated_labels_ig)
+        stats_row["new_labels"] = len(new_labels_ig)
+        stats_row["unchanged_labels"] = len(unchanged_labels_ig)
         stats_row["after_correction"] = (
-            len(updated_labels) + len(new_labels) + len(unchanged_labels)
+            len(updated_labels_ig) + len(new_labels_ig) + len(unchanged_labels_ig)
         )
-        stats_row["before_correction"] = len(image.labels)
+        stats_row["before_correction"] = len([il for il in image.labels if il.class_name == "iguana"])
 
         stats.append(stats_row)
         image.labels = updated_labels + new_labels + unchanged_labels

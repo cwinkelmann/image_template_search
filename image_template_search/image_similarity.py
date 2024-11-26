@@ -22,8 +22,6 @@ from shapely.affinity import affine_transform
 from shapely.geometry import Polygon
 
 from conf.config_dataclass import CacheConfig
-from image_template_search.image_rasterization import tile_large_image
-from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
 from image_template_search.util.util import get_similarity_cache_to_disk, get_image_dimensions
 # Import your existing functions and classes

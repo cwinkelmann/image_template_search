@@ -137,7 +137,7 @@ def debug_hasty_fiftyone(
     :return:
     """
 
-    # Create an empty dataset
+    # Create an empty dataset, TODO put this away so the dataset is just passed into this
     dataset = fo.Dataset(dataset_name)
     dataset.persistent = True
     # fo.list_datasets()

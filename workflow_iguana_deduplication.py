@@ -67,7 +67,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     assert isinstance(
         c, WorkflowConfiguration
     ), "c should be a WorkflowConfiguration object"
-
+    logger.info(f"process {c.drone_image_path} and {c.orthomosaic_path}")
     c.output_path.mkdir(exist_ok=True, parents=True)
 
     hA = hA_from_file(file_path=c.annotations_file_path)

@@ -16,11 +16,6 @@ from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabe
 from image_template_search.util.util import visualise_image, visualise_polygons
 
 
-def retrieve_from_cvat(anno_key, dataset_name = "projection_comparison"):
-
-    return results, view
-
-
 
 
 if __name__ == '__main__':
@@ -70,9 +65,6 @@ if __name__ == '__main__':
 
 
     cleanup = False
-
-    # create dot annotations
-    # results, view = retrieve_from_cvat(anno_key=anno_key, dataset_name = dataset_name)
 
     # Step 5: Merge annotations back into FiftyOne dataset
 

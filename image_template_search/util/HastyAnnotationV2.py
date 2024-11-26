@@ -55,6 +55,8 @@ class LabelClass(BaseModel):
     norder: float
     icon_url: Optional[str]
     attributes: List[str]
+    description: Optional[str]
+    use_description_as_prompt: Optional[bool] = False
 
 
 class Keypoint(BaseModel):
