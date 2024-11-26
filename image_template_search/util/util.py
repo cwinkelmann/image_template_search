@@ -501,7 +501,7 @@ def get_exif_metadata(img_path: Path) -> ExtendImageMetaData:
     return exif_meta_data
 
 
-def get_xmp_metadata(img_path: Path)->XMPMetaData:
+def get_xmp_metadata(img_path: Path) -> XMPMetaData:
     from libxmp import XMPFiles, consts
 
     metadata = {}

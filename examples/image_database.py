@@ -2,6 +2,7 @@
 read a folder of images and parse the results into a datatype
 """
 import json
+import typing
 from pathlib import Path
 
 import pandas as pd
@@ -17,13 +18,13 @@ folder_3 = Path("/Users/christian/data/2TB/ai-core/data/03.02.21/FMO04")
 
 folders = [folder, folder_2, folder_3]
 
-def get_mission_metadata(folder: Path):
+def get_mission_metadata(folder: Path) -> typing.List[ExtendImageMetaData]:
     metadata = []
 
     for i in  folder.glob("*.JPG"):
         image_meta_data = get_exif_metadata(i)
         metadata.append(image_meta_data)
-        image_meta_data.model_dump()
+        # image_meta_data.model_dump()
     return metadata
 
 

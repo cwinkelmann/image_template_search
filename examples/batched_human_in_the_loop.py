@@ -24,39 +24,22 @@ from image_template_search.util.util import visualise_image, visualise_polygons
 
 
 if __name__ == "__main__":
-    config_base_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/FCD01_02_03_DJI_0366")
+
+    # config_base_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/FCD01_02_03_DJI_0366")
+    config_base_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/")
+    config_path = "batch_workflow_report_config_Snt_STJB06_12012023.yaml"
     ## TODO add the config here
     batched_workflow_report = load_yaml_config(
         yaml_file_path=Path(
-            config_base_path / "batch_workflow_report_config_FCD01_02_03_DJI_0366.yaml"
+            config_base_path / config_path
         ),
         cls=BatchWorkflowReportConfiguration,
     )
     assert isinstance(
-        batched_workflow_report, BatchWorkflowConfiguration
-    ), "The loaded config should be a BatchWorkflowConfiguration"
-    interm_path = Path(
-        "/Users/christian/PycharmProjects/hnee/image_template_search/data/interm"
-    )
-    interm_path.mkdir(exist_ok=True, parents=True)
+        batched_workflow_report, BatchWorkflowReportConfiguration
+    ), "The loaded config should be a BatchWorkflowReportConfiguration"
 
-    for b in batched_workflow_report.workflow_configurations:
-        base_path = batched_workflow_report.base_path
-
-    ## The image for Andrea:
     base_path = batched_workflow_report.base_path
-
-    # images_dir = base_path / "Snt_STJB01_10012023/template_images"
-    # interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data") / "output" / "Snt_STJB01_10012023"
-    #
-    # drone_image_path = images_dir / "San_STJB01_10012023_DJI_0068.JPG"
-    # orthomosaic_path =  base_path / "Snt_STJB01_10012023/Snt_STJB01to05_10012023_orthomosaic_DDeploy.tif"
-    #
-    # projected_image_2_path = interm_path / "matched_template_San_STJB01_10012023_DJI_0068_Snt_STJB01to05_10012023_orthomosaic_DDeploy_cropped.jpg"
-    # annotations_file_path = interm_path / "combined_annotations.json"
-    #
-    # # corrected labels after cvat
-    # corrected_annotations_file_path = interm_path / "methods_paper_labels_corrected.json"
 
     # load hasty annotations
     hA = hA_from_file(file_path=batched_workflow_report.combined_annotations_path)
@@ -69,16 +52,7 @@ if __name__ == "__main__":
         batched_workflow_report.base_path / f"corrected_annotations_{batched_workflow_report.dataset_name}.json"
     )
 
-    # hA_images = [i for i in hA.images if i.image_name in [drone_image_path.name]]
-    # hA_projected_images = [i for i in hA.images if i.image_name in [projected_image_2_path.name]]
-    #
-    # hA.images = hA_images + hA_projected_images
-    # images_set = [projected_image_2_path, drone_image_path]
-    # assert len(hA.images) == 2, "There should be two images in there"
-
     dataset_name = batched_workflow_report.dataset_name
-
-    # anno_key = "cvat_basic_recipe"
     anno_key = dataset_name
 
     cleanup = False
@@ -104,6 +78,7 @@ if __name__ == "__main__":
         )  # a bit of a hack because there is only one keypoint schema here, but there could be more
     except:
         keypoint_class_id = "ed18e0f9-095f-46ff-bc95-febf4a53f0ff"
+
     # reconstruct an annotation file
     for sample in view:
         filepath = sample.filepath

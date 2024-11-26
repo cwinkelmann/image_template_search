@@ -1,27 +1,17 @@
-import typing
 from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
 
 from examples.review_annotations import debug_hasty_fiftyone
 from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config, \
     BatchWorkflowConfiguration, BatchWorkflowReportConfiguration
-from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
-from datetime import datetime
-
-scenario = "Snt_STJB01"
-scenario = "Snt_STJB06"
-# scenario = "FCD01_02_03"
-# scenario = "FMO04_tracking"
-import fiftyone as fo
-
-from pathlib import Path
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, HastyAnnotationV2
+from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
 
 
-def get_config(scenario: str)-> BatchWorkflowConfiguration:
-
-
+def get_config(scenario: str) -> BatchWorkflowConfiguration:
     if scenario == "FMO04_tracking":
         base_path = Path(
             "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04")
@@ -51,45 +41,44 @@ def get_config(scenario: str)-> BatchWorkflowConfiguration:
 
         drone_image_label.image_name
 
-    if scenario == "Snt_STJB01":
+    elif scenario == "San_STJB01_10012023_DJI_0068":
+        dataset_name = "San_STJB01_10012023"
         base_path = Path(
-            "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
+            f"/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/{dataset_name}"
+        )
+        bwc = BatchWorkflowConfiguration(base_path=base_path,
+                                         dataset_name=dataset_name)
 
         image_url = "https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/0577fd68-f830-45eb-969d-249e8838a28a?datasetId=cb02bc9e-5df3-4894-968d-ed474cf51ae2"
-        drone_image_path = base_path / "Snt_STJB01_10012023/template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"
-        orthomosaic_path = base_path / "Snt_STJB01_10012023/Snt_STJB01to05_10012023_orthomosaic_DDeploy.tif"  # DroneDeploy
-        # orthomosaic_path =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_Pix4D.tiff" # pix4D
-        # orthomosaic_path =  base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_Agisoft.tif" # metashape
+        drone_image_path = base_path / "template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"
+        annotations_file_path = base_path / "template_images/methods_paper_labels.json"
+
+        orthomosaic_paths = [
+            base_path / "Snt_STJB01to05_10012023_orthomosaic_DDeploy.tif",  # DroneDeploy
+            base_path / "Snt_STJB01_10012023_orthomosaic_Pix4D.tiff",  # pix4D
+            base_path / "Snt_STJB01_10012023_orthomosaic_Agisoft.tif",  # metashape
+            base_path / "Snt_STJB01_10012023_orthomosaic_ODM.tif" # ODM
+        ]
 
         # Intermediate data path
         interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
-
-        orthomosaic_path_crop = orthomosaic_path.parent.resolve() / f"{orthomosaic_path.stem}_crop.tif"
-
-        annotations_file_path = base_path / "Snt_STJB01_10012023/template_images/methods_paper_labels.json"
 
         tile_base_path = interm_path / "tiles"
         cache_path = interm_path / "cache"
         output_path = interm_path / "output" / "Snt_STJB01_10012023"
 
         # buffer distance in meters around drone image to locate location in orthomosaic
-        buffer_distance = 30
-
-        hA = hA_from_file(file_path=annotations_file_path)
-        hA.images = [i for i in hA.images if i.image_name in [drone_image_path.name]]
-        assert len(hA.images) == 1, "There should be only a single image left"
-        drone_image_label = hA.images[0]
-
-        drone_image_label.image_name
+        buffer_distance = 60
 
     # FCD01_02_03 Scenario
     # This is one of the biggest orthomosaics we can find.
     #
 
-    if scenario == "FCD01_02_03_DJI_0366":
-        # base_path = Path(
-        #     "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03"
-        # )
+    elif scenario == "FCD01_02_03_DJI_0366":
+        dataset_name = "FCD01_02_03"
+        base_path = Path(
+            f"/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/{dataset_name}"
+        )
 
         image_url = "https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/a012b2fd-6250-4af7-8d93-51fcf36930bf?datasetId=581cdd49-61ad-4e35-9dff-c6847a4f2db0"
         drone_image_path = base_path / "template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
@@ -108,12 +97,12 @@ def get_config(scenario: str)-> BatchWorkflowConfiguration:
 
         tile_base_path = interm_path / "tiles"
         cache_path = interm_path / "cache"
-        output_path = base_path / "output" / "FCD01_02_03_DJI_0366"
+        output_path = base_path / f"output_{scenario}"
 
         # buffer distance in meters around drone image to locate location in orthomosaic
         buffer_distance = 60
 
-    if scenario == "Snt_STJB06":
+    elif scenario == "Snt_STJB06":
         dataset_name = "Snt_STJB06_12012023"
         base_path = Path(
             f"/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/{dataset_name}/")
@@ -127,14 +116,14 @@ def get_config(scenario: str)-> BatchWorkflowConfiguration:
 
         ## Orthomosaics
         orthomosaic_paths = [
-                             base_path / "cog/all/Snt_STJB01to06_2012023_DDeploy_cog_pyramids.tif",  # Drone Deploy
-                             base_path / "Snt_STJB06_12012023_orthomosaic_Agisoft.tif",  # Agisoft
-                             base_path / "Snt_STJB06_10012023_orthomosaic_Agisoft_deghost.tif",
-                             # Agisoft using the deghosting
-                             base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D.tiff",  # Pix4D
-                             base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D_deghost.tiff",  # Pix4D with deghosting
-                             base_path / "Snt_STJB06_12012023_orthomosaic_ODM.tif",  # Open Dronemap
-                             ]
+            base_path / "cog/all/Snt_STJB01to06_2012023_DDeploy_cog_pyramids.tif",  # Drone Deploy
+            base_path / "Snt_STJB06_12012023_orthomosaic_Agisoft.tif",  # Agisoft
+            base_path / "Snt_STJB06_10012023_orthomosaic_Agisoft_deghost.tif",
+            # Agisoft using the deghosting
+            base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D.tiff",  # Pix4D
+            base_path / "Snt_STJB06_12012023_orthomosaic_Pix4D_deghost.tiff",  # Pix4D with deghosting
+            base_path / "Snt_STJB06_12012023_orthomosaic_ODM.tif",  # Open Dronemap
+        ]
 
         # Intermediate data path
         interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
@@ -145,6 +134,9 @@ def get_config(scenario: str)-> BatchWorkflowConfiguration:
 
         # buffer distance in meters around drone image to locate location in orthomosaic
         buffer_distance = 60
+
+    else:
+        raise ValueError("Wrong scenario given")
 
     for orthomosaic_path in orthomosaic_paths:
         c = WorkflowConfiguration(
@@ -164,9 +156,11 @@ def get_config(scenario: str)-> BatchWorkflowConfiguration:
 
     return bwc
 
+
 if __name__ == "__main__":
 
-    scenario = "Snt_STJB06"
+    # scenario = "Snt_STJB06"
+    scenario = "San_STJB01_10012023"
     # scenario = "FCD01_02_03_DJI_0366"
 
     # Get the current date and time
@@ -207,10 +201,9 @@ if __name__ == "__main__":
 
         file_path = c.base_path / f"workflow_config_{c.orthomosaic_path.stem}.yaml"
 
-        persist_file(config=c, file_path=file_path )
+        persist_file(config=c, file_path=file_path)
 
         cl = load_yaml_config(yaml_file_path=file_path, cls=WorkflowConfiguration)
-
 
         hA_projection, images_set, report = workflow_project_single_image_drone_and_annotations(cl)
 
@@ -218,7 +211,6 @@ if __name__ == "__main__":
         projection_images.extend(images_set)
 
         bwrc.workflow_report_configurations.append(report)
-
 
     hA_drone_image.images = hA_projection_images
     file_path = bwc.base_path / f"combined_annotations_{bwc.dataset_name}.json"
@@ -239,7 +231,7 @@ if __name__ == "__main__":
     datasets.append(dataset)
 
     ## Launch FiftyOne inspection app
-    import fiftyone as fo
+
     # session = fo.launch_app(dataset, port=5151)
     # session.wait()
 
@@ -264,8 +256,6 @@ if __name__ == "__main__":
         launch_editor=True,
     )
     print(dataset.get_annotation_info(bwc.dataset_name))
-
-
 
     # #### Step 7 - change the annotations in CVAT
     # Review and update the labels on cvat.ai
