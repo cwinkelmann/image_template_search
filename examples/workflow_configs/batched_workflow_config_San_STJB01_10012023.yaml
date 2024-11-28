@@ -1,0 +1,43 @@
+base_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023
+dataset_name: San_STJB01_10012023
+workflow_configurations:
+- annotations_file_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/methods_paper_labels.json
+  base_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023
+  buffer_distance: 60
+  cache_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/cache
+  drone_image_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG
+  image_url: https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/0577fd68-f830-45eb-969d-249e8838a28a?datasetId=cb02bc9e-5df3-4894-968d-ed474cf51ae2
+  interm_path: /Users/christian/PycharmProjects/hnee/image_template_search/data
+  orthomosaic_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/Snt_STJB01to05_10012023_DDeploy.tif
+  output_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/output/Snt_STJB01_10012023/Snt_STJB01to05_10012023_orthomosaic_DDeploy
+  tile_base_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/tiles
+- annotations_file_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/methods_paper_labels.json
+  base_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023
+  buffer_distance: 60
+  cache_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/cache
+  drone_image_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG
+  image_url: https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/0577fd68-f830-45eb-969d-249e8838a28a?datasetId=cb02bc9e-5df3-4894-968d-ed474cf51ae2
+  interm_path: /Users/christian/PycharmProjects/hnee/image_template_search/data
+  orthomosaic_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_Pix4D.tif
+  output_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/output/Snt_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_Pix4D
+  tile_base_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/tiles
+- annotations_file_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/methods_paper_labels.json
+  base_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023
+  buffer_distance: 60
+  cache_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/cache
+  drone_image_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG
+  image_url: https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/0577fd68-f830-45eb-969d-249e8838a28a?datasetId=cb02bc9e-5df3-4894-968d-ed474cf51ae2
+  interm_path: /Users/christian/PycharmProjects/hnee/image_template_search/data
+  orthomosaic_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_Agisoft.tif
+  output_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/output/Snt_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_Agisoft
+  tile_base_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/tiles
+- annotations_file_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/methods_paper_labels.json
+  base_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023
+  buffer_distance: 60
+  cache_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/cache
+  drone_image_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/template_images/Snt_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG
+  image_url: https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/0577fd68-f830-45eb-969d-249e8838a28a?datasetId=cb02bc9e-5df3-4894-968d-ed474cf51ae2
+  interm_path: /Users/christian/PycharmProjects/hnee/image_template_search/data
+  orthomosaic_path: /Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_ODM.tif
+  output_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/output/Snt_STJB01_10012023/Snt_STJB01_10012023_orthomosaic_ODM
+  tile_base_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/tiles

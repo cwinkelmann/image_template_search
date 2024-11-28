@@ -29,6 +29,10 @@ def persist_file(file_path: Path, config: dataclass):
     with open(file_path, "w") as file:
         yaml.dump(processed_data, file, default_flow_style=False, Dumper=PathDumper)
 
+def data_to_cls(d, cls):
+    # Convert string paths to Path objects
+    d = {k: Path(v) if k.endswith('_path') and v is not None else v for k, v in d.items()}
+    return cls(**d)
 
 def load_yaml_config(yaml_file_path: Path, cls: dataclass):
     PathLoader.add_constructor("!Path", path_constructor)
@@ -37,10 +41,7 @@ def load_yaml_config(yaml_file_path: Path, cls: dataclass):
     with open(yaml_file_path, 'r') as file:
         data= yaml.load(file, Loader=PathLoader)
 
-    # Convert string paths back to Path objects
-    data = {k: Path(v) if k.endswith('_path') and v is not None else v for k, v in data.items()}
-
-    return cls(**data)
+    return data_to_cls(data, cls)
 
 # Convert data to a dictionary and ensure all Path objects are converted to strings
 def serialize_paths(data):

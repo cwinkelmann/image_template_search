@@ -25,13 +25,13 @@ from image_template_search.util.util import visualise_image, visualise_polygons
 
 if __name__ == "__main__":
 
-    # config_base_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/FCD01_02_03_DJI_0366")
-    config_base_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/")
-    config_path = "batch_workflow_report_config_Snt_STJB06_12012023.yaml"
-    ## TODO add the config here
+    # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/batch_workflow_report_config_San_STJB01_10012023.yaml")
+    config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/batch_workflow_report_config_Snt_STJB06_12012023.yaml")
+    # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03/batch_workflow_report_config_FCD01_02_03.yaml")
+
     batched_workflow_report = load_yaml_config(
         yaml_file_path=Path(
-            config_base_path / config_path
+            config_path
         ),
         cls=BatchWorkflowReportConfiguration,
     )
@@ -144,8 +144,7 @@ if __name__ == "__main__":
         else:
             logger.info(f"Sample {sample.id} has no ground_truth_boxes")
 
-        # TODO if the label was changed this has to be reflected in the attributes
-        # TODO if the label was changed this has to be reflected in the stats
+
         if hasattr(sample, "ground_truth_points"):
             for kp in sample.ground_truth_points.keypoints:
                 # iterate over the keypoints
@@ -217,8 +216,6 @@ if __name__ == "__main__":
 
         hA_corrected.images.append(image)
 
-        # TODO plot these images
-        # ToDO correct titles
         ax_c = visualise_image(
             image_path=filepath, dpi=100, title=f"Corrected labels {hasty_filename}"
         )
@@ -242,10 +239,12 @@ if __name__ == "__main__":
     stats_path = batched_workflow_report.base_path / "stats.csv"
     stats_df.to_csv(stats_path, index=False)
 
+    print(f"stats of the images set: {stats_df}")
+
     batched_workflow_report.stats_path = stats_path
 
     persist_file(
-        file_path=Path(config_base_path / "batch_workflow_report_config_FCD01_02_03_DJI_0366.yaml"),
+        file_path= Path(f"{config_path.stem}_corrected.yaml"),
         config=batched_workflow_report
     )
 

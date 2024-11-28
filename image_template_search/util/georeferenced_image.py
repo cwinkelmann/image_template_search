@@ -1,20 +1,10 @@
 import typing
-from pathlib import Path
-
-import shapely.geometry
-from pydantic import BaseModel, Field
-
-from image_template_search.util.HastyAnnotationV2 import AnnotatedImage
-
-
-from typing import Optional, Tuple
-from pydantic import BaseModel
-from enum import Enum
-from datetime import datetime
-
-
 # Define enumerations based on the dictionary values
 from enum import Enum
+from typing import Tuple
+import datetime
+from pydantic import BaseModel
+from pydantic import Field
 
 
 class ColorSpace(Enum):
@@ -133,7 +123,7 @@ class ExifMetaData(BaseModel):
     compression: int
     contrast: int
     datetime: str  # Original format appears to be 'YYYY:MM:DD HH:MM:SS'
-    datetime_digitized: datetime
+    datetime_digitized: datetime.datetime
     datetime_original: str  # Same format as `datetime`
     digital_zoom_ratio: float
     exif_version: str

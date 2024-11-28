@@ -189,6 +189,41 @@ def batch_convert_to_cog(input_files, output_dir, max_workers=4):
             future.result()
 
 
+def create_universal_grid(extent, cell_size_km, crs="EPSG:32715"):
+    """
+    Creates a regular grid within a specified extent.
+
+    Args:
+        extent (tuple): (xmin, ymin, xmax, ymax) of the bounding box.
+        cell_size_km (float): Edge length of the grid cells in kilometers.
+        crs (str): Coordinate Reference System (e.g., EPSG:32715 for UTM Zone 15S).
+
+    Returns:
+        GeoDataFrame: A GeoDataFrame containing the grid.
+    """
+
+    import geopandas as gpd
+    from shapely.geometry import box
+
+
+
+    xmin, ymin, xmax, ymax = extent
+    cell_size = cell_size_km * 1000  # Convert km to meters
+
+    # Generate grid cells
+    grid_cells = []
+    x = xmin
+    while x < xmax:
+        y = ymin
+        while y < ymax:
+            grid_cells.append(box(x, y, x + cell_size, y + cell_size))
+            y += cell_size
+        x += cell_size
+
+    # Create GeoDataFrame
+    grid = gpd.GeoDataFrame({"geometry": grid_cells}, crs=crs)
+    return grid
+
 
 
 

@@ -1,3 +1,4 @@
+import typing
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -7,7 +8,7 @@ from loguru import logger
 from examples.review_annotations import debug_hasty_fiftyone
 from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config, \
     BatchWorkflowConfiguration, BatchWorkflowReportConfiguration
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, HastyAnnotationV2
+from image_template_search.util.HastyAnnotationV2 import hA_from_file, HastyAnnotationV2, AnnotatedImage
 from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
 
 
@@ -72,13 +73,14 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
 
     # FCD01_02_03 Scenario
     # This is one of the biggest orthomosaics we can find.
-    #
-
     elif scenario == "FCD01_02_03_DJI_0366":
         dataset_name = "FCD01_02_03"
         base_path = Path(
             f"/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/{dataset_name}"
         )
+
+        bwc = BatchWorkflowConfiguration(base_path=base_path,
+                                         dataset_name=dataset_name)
 
         image_url = "https://app.hasty.ai/projects/7899e6d9-6668-45c1-902d-00be21cabf7d/image/a012b2fd-6250-4af7-8d93-51fcf36930bf?datasetId=581cdd49-61ad-4e35-9dff-c6847a4f2db0"
         drone_image_path = base_path / "template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
@@ -102,7 +104,7 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
         # buffer distance in meters around drone image to locate location in orthomosaic
         buffer_distance = 60
 
-    elif scenario == "Snt_STJB06":
+    elif scenario == "San_STJB06_10012023_DJI_0145":
         dataset_name = "Snt_STJB06_12012023"
         base_path = Path(
             f"/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/{dataset_name}/")
@@ -157,11 +159,12 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
     return bwc
 
 
+
 if __name__ == "__main__":
 
-    # scenario = "Snt_STJB06"
-    scenario = "San_STJB01_10012023"
-    # scenario = "FCD01_02_03_DJI_0366"
+    scenario = "San_STJB01_10012023_DJI_0068"
+    #scenario = "San_STJB06_10012023_DJI_0145"
+    #scenario = "FCD01_02_03_DJI_0366"
 
     # Get the current date and time
     now = datetime.now()
@@ -169,99 +172,12 @@ if __name__ == "__main__":
     # Format the date, hours, and minutes into a string
     formatted_string = now.strftime("%Y-%m-%d %H:%M")
 
-    # dataset_name = f"{scenario}"
-
-    datasets = []
-    hA_projection_images = []
-    projection_images = []
-
-    # try:
-    #     fo.delete_dataset(dataset_name)
-    # except:
-    #     logger.warning(f"Dataset {dataset_name} does not exist yet")
-    # base_path = Path(f"/Users/christian/PycharmProjects/hnee/image_template_search/data/output/{dataset_name}")
-    # bwc = BatchWorkflowConfiguration(base_path=base_path,
-    #                                                 dataset_name=dataset_name)
-    #
-    # for c in get_config(scenario=scenario, base_path = base_path):
-    #     bwc.workflow_configurations.append(c)
-    #
-
     bwc = get_config(scenario=scenario)
-    bwrc = BatchWorkflowReportConfiguration(**asdict(bwc))
+    bwc_file_path = Path(f"./workflow_configs/batched_workflow_config_{bwc.dataset_name}.yaml")
+    persist_file(config=bwc, file_path=bwc_file_path)
 
-    for c in bwc.workflow_configurations:
-        # if the drone image is not part of the annotations, we need to add it
-        hA_drone_image = hA_from_file(file_path=c.annotations_file_path)
-        hA_drone_images = [i for i in hA_drone_image.images if i.image_name in [c.drone_image_path.name]]
-        drone_image_path = c.drone_image_path
-        if not drone_image_path in projection_images:
-            hA_projection_images.extend(hA_drone_images)
-            projection_images.append(drone_image_path)
+    logger.info(f"Wrote config to {bwc_file_path.resolve()}")
 
-        file_path = c.base_path / f"workflow_config_{c.orthomosaic_path.stem}.yaml"
 
-        persist_file(config=c, file_path=file_path)
 
-        cl = load_yaml_config(yaml_file_path=file_path, cls=WorkflowConfiguration)
 
-        hA_projection, images_set, report = workflow_project_single_image_drone_and_annotations(cl)
-
-        hA_projection_images.extend(hA_projection.images)
-        projection_images.extend(images_set)
-
-        bwrc.workflow_report_configurations.append(report)
-
-    hA_drone_image.images = hA_projection_images
-    file_path = bwc.base_path / f"combined_annotations_{bwc.dataset_name}.json"
-    HastyAnnotationV2.save(hA_drone_image, file_path=file_path)
-    bwrc.combined_annotations_path = file_path
-
-    persist_file(config=bwc, file_path=bwc.base_path / f"batch_workflow_config_{bwc.dataset_name}.yaml")
-    persist_file(config=bwrc, file_path=bwc.base_path / f"batch_workflow_report_config_{bwc.dataset_name}.yaml")
-
-    # create dot annotations
-    dataset = debug_hasty_fiftyone(
-        annotated_images=hA_projection_images,
-        images_set=projection_images,
-        dataset_name=bwc.dataset_name,
-        type="points",
-    )
-
-    datasets.append(dataset)
-
-    ## Launch FiftyOne inspection app
-
-    # session = fo.launch_app(dataset, port=5151)
-    # session.wait()
-
-    # sample_id = dataset.first().id
-    # view = dataset.select(sample_id)
-
-    for i, s in enumerate(dataset):
-        logger.info(f"sample {i} of the dataset")
-
-    # Step 3: Send samples to CVAT
-
-    # A unique identifier for this run
-    # anno_key = f"cvat_basic_recipe_{orthomosaic_path.stem}"
-
-    dataset.annotate(
-        anno_key=bwc.dataset_name,
-        # Using a organization requires a team account for 33USD
-        # project_name = "Orthomosaic_quality_control",
-        # organization=organization
-        label_field="ground_truth_points",
-        attributes=["iscrowd"],
-        launch_editor=True,
-    )
-    print(dataset.get_annotation_info(bwc.dataset_name))
-
-    # #### Step 7 - change the annotations in CVAT
-    # Review and update the labels on cvat.ai
-    #
-    #
-
-    # #### Step 8 - download the annotations again
-    # TODO
-    # Look into the human_in_the_loop_delete script
