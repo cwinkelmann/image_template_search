@@ -5,11 +5,14 @@ from time import sleep
 
 import numpy as np
 
-from image_template_search.image_similarity import find_patch, find_patch_tiled, find_patch_stacked
+from image_template_search.image_patch_finder import find_patch, find_patch_stacked, find_patch_tiled
 from image_template_search.util.util import visualise_image
 
 
 class ImageSimilarityTestCase(unittest.TestCase):
+
+
+
     def test_template_images_search(self):
         """
         Find similar images in a dataset

@@ -23,7 +23,8 @@ from shapely.geometry.polygon import Polygon
 
 from conf.config_dataclass import CacheConfig
 from detection_deduplication import find_objects, find_objects_individual_all
-from image_template_search.image_similarity import ImagePatchFinderLG, project_bounding_box
+from image_template_search.util.projection import project_bounding_box
+from image_template_search.image_patch_finder import ImagePatchFinderLG
 from image_template_search.util.CoveredObjectType import CoveredObject
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, AnnotatedImage
 from image_template_search.util.TemplateDataType import TemplateData

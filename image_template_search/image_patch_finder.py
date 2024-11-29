@@ -4,16 +4,20 @@ import random
 import typing
 from pathlib import Path
 
+import PIL.Image
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import shapely
 from PIL import Image
 from loguru import logger
+from matplotlib import pyplot as plt
+from shapely import Polygon
 from shapely.geometry import Polygon
 
 from image_template_search.image_rasterization import tile_large_image
-from image_template_search.image_similarity import project_bounding_box
+from image_template_search.image_similarity import get_similarity, find_rotation_gen_cv2
+from image_template_search.util.projection import project_bounding_box
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher
 from image_template_search.util.util import get_image_dimensions
 
@@ -96,45 +100,6 @@ def _cached_tiled_keypoints_and_descriptors_extraction(detector,
     gc.collect()
 
     return kp2, des2
-
-
-def project_image(M, template_path, large_image_path, output_path,
-                  visualise=False,
-                  buffer=0) -> Path:
-    """
-    :param M:
-    :param template_path:
-    :param large_image_path:
-    :param output_path:
-    :param visualise:
-    :return:
-    """
-    # TODO class variable
-    M_ = np.linalg.inv(M)
-
-    template_image = Image.open(
-        template_path)  # Replace with your image file path
-    if template_image.mode != "RGB":
-        template_image = template_image.convert("RGB")
-    template_image = np.array(template_image)
-
-    large_image = Image.open(large_image_path)  # Replace with your image file path
-    if large_image.mode != "RGB":
-        large_image = large_image.convert("RGB")
-    large_image = np.array(large_image)
-
-    rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
-                                                     (template_image.shape[1]+buffer, template_image.shape[0]+buffer))
-    if visualise:
-        fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
-        # Display the result
-        plt.imshow(rotated_cropped_image_bbox)
-        # plt.axis('off')  # Hide axis
-        plt.show()
-    rotated_cropped_image_bbox_path = output_path / f"mt_{template_path.stem}_{large_image_path.stem}.jpg"
-    cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
-
-    return rotated_cropped_image_bbox_path
 
 
 def find_patch_tiled(template_path: Path,
@@ -361,3 +326,243 @@ class ImagePatchFinderCV(object):
         logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
 
         return True
+
+
+class ImagePatchFinderLG(object):
+    """
+    find a patch on an image in another image and calculate the homography between the two
+    """
+
+    footprint: shapely.Polygon
+    template_path: Path
+    template_polygon: shapely.Polygon
+    proj_template_polygon: shapely.Polygon
+    large_image_path: Path
+
+    large_image: np.ndarray
+    large_image_shape: tuple
+    warped_image_B: np.ndarray
+
+    M_: np.ndarray
+    M: np.ndarray
+    mask: np.ndarray
+    theta: float
+
+    def __init__(self, template_path, large_image_path):
+        """
+
+        :param template_path: The image which is to be found in the large image
+        :param template_polygon: The footprint of the template image
+        :param large_image_path:
+        """
+        self.template_image = None
+        self.warped_image_B = None
+        self.proj_template_polygon = None
+        self.footprint = None
+        self.M_ = None
+        self.M = None
+        self.mask = None
+
+        self.template_path = template_path
+
+        width, height = get_image_dimensions(template_path)
+        template_polygon = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
+
+        self.template_polygon = template_polygon
+        self.large_image_path = large_image_path
+        self.matched_templates = []
+
+    def __call__(self, *args, **kwargs):
+        return self.find_patch()
+
+    def find_patch(self,
+                   output_path=Path("./output"),
+                   similarity_threshold=0.05):
+        """
+        Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
+        TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
+        :param similarity_threshold:
+        :param template_path:
+        :param large_image_path:
+        :param output_path:
+        :return:
+        """
+        normalised_sim, m_kpts0, m_kpts1 = get_similarity(self.template_path,
+                                                          Path(self.large_image_path))
+
+        if len(m_kpts0) < 10 or len(m_kpts1) < 10:
+            logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
+            logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
+
+            raise ValueError(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
+
+        if not isinstance(output_path, Path):
+            output_path = Path(output_path)
+
+        logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
+        M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
+                                               m_kpts1.cpu().numpy(),
+                                               image_name=self.large_image_path)
+
+        self.M = M
+        self.M_ = np.linalg.inv(M)
+        self.mask = mask
+
+        self.proj_template_polygon = project_bounding_box(self.template_polygon, M)
+
+        self.footprint = footprint
+
+        # calculate the rotation of the camera
+        self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
+        logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
+
+        return True
+
+    def project_image(self, output_path):
+        """
+        Project large image to the footprint of the template image
+        :return:
+        """
+
+        template_image = cv2.imread(str(self.template_path))
+        self.template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
+
+        large_image = cv2.imread(str(self.large_image_path), cv2.IMREAD_COLOR)
+        self.large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+        self.large_image_shape = self.large_image.shape
+
+        # warp the other large image to the template image
+        self.warped_image_B = cv2.warpPerspective(self.large_image,
+                                                  self.M_,
+                                                  dsize=(
+                                                      self.template_image.shape[1], self.template_image.shape[0]))
+
+        matched_source_image = f"warped_source_{self.template_path.stem}_match_{self.large_image_path.stem}.jpg"
+
+        Path(output_path).mkdir(exist_ok=True, parents=True)
+        warped_other_image_path = output_path / matched_source_image
+        cv2.imwrite(str(warped_other_image_path), cv2.cvtColor(self.warped_image_B, cv2.COLOR_RGB2BGR))
+
+        return warped_other_image_path
+
+
+def find_patch(template_path: Path,
+               large_image_path: Path,
+               output_path=Path("./output")):
+    """
+    Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
+    TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
+    :param template_path:
+    :param large_image_path:
+    :param output_path:
+    :return:
+    """
+
+    normalised_sim, m_kpts0, m_kpts1 = get_similarity(template_path, Path(large_image_path, max))
+    # normalised_sim, m_kpts0, m_kpts1 = get_similarity_tiled(template_path, Path(large_image_path))
+    logger.info(f"normalised_sim: {normalised_sim}")
+
+    fx = 1  # TODO clarify if this is needed
+    fy = 1
+
+    if not isinstance(output_path, Path):
+        output_path = Path(output_path)
+
+    template_identifier = template_path.stem
+    large_image_identifier = large_image_path.stem
+
+    M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
+                                           m_kpts1.cpu().numpy(),
+                                           image_name=large_image_path)
+
+    img1 = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
+    img1 = cv2.resize(img1, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+
+    h, w = img1.shape
+    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
+                                                                               2)  # This is the box of the query image
+
+    dst = cv2.perspectiveTransform(pts, M)
+
+    new_image_footprint = dst
+    # draw the matches outer box
+    footprint = np.int32(dst.reshape(4, 2))
+    ## TODO create the footprint from that
+
+    ## plot the footprint of the template on the base image
+    footprint = shapely.Polygon(footprint.reshape(4, 2))
+    bounds = footprint.bounds
+
+    fig = plt.figure(figsize=(20, 20))
+    large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
+    large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+
+    large_image_l = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
+    large_image_l = cv2.resize(large_image_l, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+
+    plt.imshow(large_image_l, 'gray')
+    fig.savefig(output_path / f"t_{template_identifier}_b{large_image_identifier}_large_image_footprint.jpg")
+    plt.show()
+
+    # TODO class variable
+    theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
+    print(f"The camera rotated: {round(theta, 2)} degrees")
+
+    # TODO class variable
+    M_ = np.linalg.inv(M)
+    M_
+
+    large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
+    large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+    template_image = cv2.imread(str(template_path))
+    template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
+
+    rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
+                                                     (template_image.shape[1], template_image.shape[0]))
+
+    fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
+    # Display the result
+    plt.imshow(rotated_cropped_image_bbox)
+    # plt.axis('off')  # Hide axis
+    plt.show()
+    rotated_cropped_image_bbox_path = output_path / f"t_{template_identifier}_b{large_image_identifier}_rotated_cropped_image_bbox.jpg"
+    cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+
+    return rotated_cropped_image_bbox, footprint
+
+
+def find_patch_stacked(template_path, large_image_paths, output_path,
+                       tile_path, cache_path, MIN_MATCH_COUNT=50,
+                       tile_size_x=1500, tile_size_y=1500,
+                       visualise=False):
+    """
+    find a crop in multiple other images
+
+    :param template_path:
+    :param large_image_paths:
+    :param output_path:
+    :param cache_path:
+    :return:
+    """
+
+    ## TODO use at least multiprocessing or dask to parallize this
+    crops = []
+
+    for large_image_path in large_image_paths:
+        logger.info(f"finding patch in {large_image_path}")
+        crop = find_patch_tiled(template_path,
+                                large_image_path,
+                                output_path=output_path,
+                                cache_path=cache_path,
+                                MIN_MATCH_COUNT=MIN_MATCH_COUNT,
+                                tile_size_x=tile_size_x, tile_size_y=tile_size_y, visualise=False)
+
+        if isinstance(crop, np.ndarray):
+            crops.append(crop)
+            im = PIL.Image.fromarray(crop)
+            im.save(output_path / f"crop_{large_image_path.stem}_t_{template_path.stem}.jpeg")
+        else:
+            # no match
+            pass
+
+    return crops

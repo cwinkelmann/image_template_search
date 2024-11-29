@@ -22,7 +22,7 @@ from image_template_search.types.workflow_config import (
 from image_template_search.util.HastyAnnotationV2 import hA_from_file
 from image_template_search.util.util import get_exif_metadata
 from image_template_search.util.util import visualise_image, visualise_polygons
-from image_template_search.image_patch_finder import ImagePatchFinderCV
+from image_template_search.image_patch_finder import ImagePatchFinderCV, ImagePatchFinderLG
 
 from rasterio import CRS
 from image_template_search.geospatial_transformations import (
@@ -34,14 +34,13 @@ from loguru import logger
 import rasterio
 from image_template_search.clip_by_location import clip_orthomoasic_by_location
 import shapely
-from image_template_search.image_similarity import ImagePatchFinderLG
 from image_template_search.util.HastyAnnotationV2 import (
     HastyAnnotationV2,
     AnnotatedImage,
 )
 from PIL import Image as PILImage
 
-from image_template_search.image_patch_finder import project_image
+from image_template_search.util.projection import project_image
 
 from examples.review_annotations import debug_hasty_fiftyone
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from shapely.geometry.polygon import Polygon
 
-from image_template_search.image_similarity import ImagePatchFinderLG
+from image_template_search.image_patch_finder import ImagePatchFinderLG
 from PIL import Image as PILImage
 
 from image_template_search.util.util import visualise_image
