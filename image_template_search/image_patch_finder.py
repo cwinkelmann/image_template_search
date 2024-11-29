@@ -15,7 +15,9 @@ from matplotlib import pyplot as plt
 from shapely import Polygon
 from shapely.geometry import Polygon
 
+from conf.config_dataclass import CacheConfig
 from image_template_search.image_rasterization import tile_large_image
+from image_template_search.image_similarity import get_similarity
 from image_template_search.image_similarity import get_similarity, find_rotation_gen_cv2
 from image_template_search.util.projection import project_bounding_box
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher
@@ -457,78 +459,84 @@ def find_patch(template_path: Path,
     :param output_path:
     :return:
     """
+    logger.warning("This method is deprecated. Use ImagePatchFinderLG or ImageFinderCV instead")
+    normalised_sim, m_kpts0, m_kpts1 = get_similarity(template_path,
+                                                      Path(large_image_path),
+                                                        max_num_keypoints=CacheConfig.max_num_keypoints)
 
-    normalised_sim, m_kpts0, m_kpts1 = get_similarity(template_path, Path(large_image_path, max))
-    # normalised_sim, m_kpts0, m_kpts1 = get_similarity_tiled(template_path, Path(large_image_path))
     logger.info(f"normalised_sim: {normalised_sim}")
 
-    fx = 1  # TODO clarify if this is needed
-    fy = 1
+    if normalised_sim > 0.15:
+        fx = 1  # TODO clarify if this is needed
+        fy = 1
 
-    if not isinstance(output_path, Path):
-        output_path = Path(output_path)
+        if not isinstance(output_path, Path):
+            output_path = Path(output_path)
 
-    template_identifier = template_path.stem
-    large_image_identifier = large_image_path.stem
+        template_identifier = template_path.stem
+        large_image_identifier = large_image_path.stem
 
-    M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
-                                           m_kpts1.cpu().numpy(),
-                                           image_name=large_image_path)
+        M, mask, footprint = find_rotation_gen_cv2(m_kpts0.cpu().numpy(),
+                                               m_kpts1.cpu().numpy(),
+                                               image_name=large_image_path)
 
-    img1 = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
-    img1 = cv2.resize(img1, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+        img1 = cv2.imread(str(template_path), cv2.IMREAD_GRAYSCALE)  # train
+        img1 = cv2.resize(img1, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
 
-    h, w = img1.shape
-    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
-                                                                               2)  # This is the box of the query image
+        h, w = img1.shape
+        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1,
+                                                                                   2)  # This is the box of the query image
 
-    dst = cv2.perspectiveTransform(pts, M)
+        dst = cv2.perspectiveTransform(pts, M)
 
-    new_image_footprint = dst
-    # draw the matches outer box
-    footprint = np.int32(dst.reshape(4, 2))
-    ## TODO create the footprint from that
+        new_image_footprint = dst
+        # draw the matches outer box
+        footprint = np.int32(dst.reshape(4, 2))
 
-    ## plot the footprint of the template on the base image
-    footprint = shapely.Polygon(footprint.reshape(4, 2))
-    bounds = footprint.bounds
 
-    fig = plt.figure(figsize=(20, 20))
-    large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
-    large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+        ## plot the footprint of the template on the base image
+        footprint = shapely.Polygon(footprint.reshape(4, 2))
+        bounds = footprint.bounds
 
-    large_image_l = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
-    large_image_l = cv2.resize(large_image_l, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
+        fig = plt.figure(figsize=(20, 20))
+        large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
+        large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
 
-    plt.imshow(large_image_l, 'gray')
-    fig.savefig(output_path / f"t_{template_identifier}_b{large_image_identifier}_large_image_footprint.jpg")
-    plt.show()
+        large_image_l = cv2.polylines(large_image, [np.int32(dst)], True, 255, 53, cv2.LINE_AA)
+        large_image_l = cv2.resize(large_image_l, None, fx=fx, fy=fy, interpolation=cv2.INTER_AREA)
 
-    # TODO class variable
-    theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
-    print(f"The camera rotated: {round(theta, 2)} degrees")
+        plt.imshow(large_image_l, 'gray')
+        fig.savefig(output_path / f"t_{template_identifier}_b{large_image_identifier}_large_image_footprint.jpg")
+        plt.show()
 
-    # TODO class variable
-    M_ = np.linalg.inv(M)
-    M_
+        # TODO class variable
+        theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
+        print(f"The camera rotated: {round(theta, 2)} degrees")
 
-    large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
-    large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
-    template_image = cv2.imread(str(template_path))
-    template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
+        # TODO class variable
+        M_ = np.linalg.inv(M)
+        M_
 
-    rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
-                                                     (template_image.shape[1], template_image.shape[0]))
+        large_image = cv2.imread(large_image_path, cv2.IMREAD_COLOR)
+        large_image = cv2.cvtColor(large_image, cv2.COLOR_BGR2RGB)
+        template_image = cv2.imread(str(template_path))
+        template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
 
-    fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
-    # Display the result
-    plt.imshow(rotated_cropped_image_bbox)
-    # plt.axis('off')  # Hide axis
-    plt.show()
-    rotated_cropped_image_bbox_path = output_path / f"t_{template_identifier}_b{large_image_identifier}_rotated_cropped_image_bbox.jpg"
-    cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+        rotated_cropped_image_bbox = cv2.warpPerspective(large_image, M_,
+                                                         (template_image.shape[1], template_image.shape[0]))
 
-    return rotated_cropped_image_bbox, footprint
+        fig, axes = plt.subplots(1, sharey=True, figsize=(13, 12))
+        # Display the result
+        plt.imshow(rotated_cropped_image_bbox)
+        # plt.axis('off')  # Hide axis
+        plt.show()
+        rotated_cropped_image_bbox_path = output_path / f"t_{template_identifier}_b{large_image_identifier}_rotated_cropped_image_bbox.jpg"
+        cv2.imwrite(str(rotated_cropped_image_bbox_path), cv2.cvtColor(rotated_cropped_image_bbox, cv2.COLOR_RGB2BGR))
+
+        return rotated_cropped_image_bbox, footprint
+    else:
+        logger.error(f"Template {template_path} not found in {large_image_path}")
+        return False, False
 
 
 def find_patch_stacked(template_path, large_image_paths, output_path,

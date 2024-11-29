@@ -17,7 +17,7 @@ from PIL import Image
 from loguru import logger
 from shapely.geometry import Polygon
 
-from conf.config_dataclass import CacheConfig
+from conf.config_dataclass import CacheConfig, get_config
 from image_template_search.util.image import image_patcher
 from image_template_search.util.util import get_similarity_cache_to_disk, get_image_dimensions
 
@@ -43,6 +43,7 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
     :return: Tuple containing the similarity score, matched keypoints in the template,
              and matched keypoints in the frame image.
     """
+    logger.warning("This has been deprecated and will be removed in the future. Use the cached get_similarity() instead.")
     image_template_T = load_image(template_image)  # Shape: (C, H, W)
     image1_T = load_image(image1)  # Shape: (C, H, W)
 
@@ -224,57 +225,56 @@ def get_similarity(template_image: Path,
     :param image2:
     :return:
     """
-
+    PIL.Image.MAX_IMAGE_PIXELS = 5223651122
     device = torch.device("cuda" if torch.cuda.is_available() else CacheConfig.device)  # 'mps', 'cpu'
     torch.set_grad_enabled(False)
-    # TODO get the image_size
-    with Image.open(template_image) as img:
-        template_width, template_height = img.size
 
-    PIL.Image.MAX_IMAGE_PIXELS = 5223651122
-    with Image.open(image1) as img:
-        img1_width, img1_height = img.size
-        # img = img.convert("RGB")
+
+    template_width, template_height = get_image_dimensions(template_image)
+    img1_width, img1_height = get_image_dimensions(image1)
+
+    necesary_matches = 100
 
     N_x = N_y = 2  # TODO evaluate this
     if img1_width - 1000 > template_width and img1_height - 1000 > template_height:
         N_x = img1_width // template_width
         N_y = img1_height // template_height
 
+        max_num_keypoints = max_num_keypoints // (N_x) ## TODO this is a hack to reduce the number of keypoints when image dimensions differ
+
     logger.info(f"Using {N_x} x {N_y} tiles")
 
     logger.info(f"START extracting features from {template_image.name}")
-    feats0, _ = extractor_wrapper(image_path=template_image, max_num_keypoints=max_num_keypoints)
+    feats_template, _ = extractor_wrapper(image_path=template_image, max_num_keypoints=max_num_keypoints)
     logger.info(f"DONE extracting features from {template_image.name}")
 
     logger.info(f"START extracting features from {image1.name}")
     e = SIFT(max_num_keypoints=max_num_keypoints).eval().to(device)  # load the extractor
-    # e = SuperPoint(max_num_keypoints=max_num_keypoints ).eval().to(device)  # load the extractor
     extractor = TiledExtractor(extractor=e)
 
-    feats1 = extractor.extract(image_path=image1, N_x=N_x, N_y=N_y)
+    feats_other = extractor.extract(image_path=image1, N_x=N_x, N_y=N_y)
     logger.info(f"DONE extracting features from {image1.name}")
 
     # feats0, image1_T  = extractor_wrapper(image_path=template_image, max_num_keypoints=10000)
     # image1_T = load_image(image1)
 
     # matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="superpoint")
-    matches01 = matcher_wrapper(feats0=feats0, feats1=feats1, feature_type="sift")
+    matches01 = matcher_wrapper(feats0=feats_template, feats1=feats_other, feature_type="sift")
 
-    feats0, feats1, matches01 = [
-        rbd(x) for x in [feats0, feats1, matches01]
+    feats_template, feats_other, matches01 = [
+        rbd(x) for x in [feats_template, feats_other, matches01]
     ]  # remove batch dimension
 
-    kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches01["matches"]
+    kpts_template, kpts_other, matches = feats_template["keypoints"], feats_other["keypoints"], matches01["matches"]
 
     # TODO correct this calculation if the images have a different size
-    normalised_sim = matches.size()[0] / kpts0.size()[0]
+    normalised_sim = matches.size()[0] / necesary_matches
 
     # get matched keypoints only
-    m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
+    m_kpts0, m_kpts1 = kpts_template[matches[..., 0]], kpts_other[matches[..., 1]]
 
 
-    if CacheConfig.visualise_matching:
+    if get_config().visualise_matching:
         ## Display the matches
         image0 = load_image(template_image)
         image1 = load_image(image1)
@@ -284,7 +284,7 @@ def get_similarity(template_image: Path,
 
         kpc0, kpc1 = viz2d.cm_prune(matches01["prune0"]), viz2d.cm_prune(matches01["prune1"])
         viz2d.plot_images([image0, image1])
-        viz2d.plot_keypoints([kpts0, kpts1], colors=[kpc0, kpc1], ps=6)
+        viz2d.plot_keypoints([kpts_template, kpts_other], colors=[kpc0, kpc1], ps=6)
 
         plt.show()
 

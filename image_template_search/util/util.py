@@ -21,7 +21,7 @@ import hashlib
 from pathlib import Path
 from joblib import Memory
 
-from conf.config_dataclass import CacheConfig
+from conf.config_dataclass import CacheConfig, get_config
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
 from image_template_search.util.georeferenced_image import ExifMetaData, XMPMetaData, ExtendImageMetaData
 
@@ -127,7 +127,7 @@ def get_similarity_cache_to_disk():
     """
 
     def decorator(func):
-        cache_dir = CacheConfig.cache_path
+        cache_dir = get_config().cache_path
 
         @wraps(func)
         def wrapper(image0: Path, image1: Path, *args, **kwargs):
