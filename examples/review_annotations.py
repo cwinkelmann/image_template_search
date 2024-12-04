@@ -12,6 +12,7 @@ import PIL.Image as Image
 import fiftyone as fo
 import pandas as pd
 import shapely
+from loguru import logger
 
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, AnnotatedImage
 
@@ -103,7 +104,6 @@ def _create_boxes_s(hA_image: AnnotatedImage) -> typing.List[fo.Detection]:
     w, h = hA_image.width, hA_image.height
 
     for r in hA_image.labels:
-        pt = (int(r.centroid.x) / w, int(r.centroid.y) / h)
 
         x1, y1, x2, y2 = r.x1y1x2y2[0], r.x1y1x2y2[1], r.x1y1x2y2[2], r.x1y1x2y2[3]
         box_w, box_h = x2 - x1, y2 - y1
@@ -124,6 +124,42 @@ def _create_boxes_s(hA_image: AnnotatedImage) -> typing.List[fo.Detection]:
 
         boxes.append(kp)
     return boxes
+
+
+def _create_polygons_s(hA_image: AnnotatedImage) -> typing.List[fo.Polyline]:
+    """
+    Creates a list of polylines (polygons) from the annotated image.
+
+    :param hA_image: The annotated image containing labels with polygon points.
+    :return: A list of fo.Polyline objects representing the polygons.
+    """
+    polygons = []
+    w, h = hA_image.width, hA_image.height
+
+    for r in hA_image.labels:
+        lab = r.class_name
+
+        # Assuming r.points is a list of (x, y) tuples or lists in image coordinates
+        # For example: r.points = [[x1, y1], [x2, y2], ..., [xn, yn]]
+        # If your data structure is different, adjust the extraction accordingly.
+        points = r.polygon_s.exterior.coords
+
+        # Normalize points to be relative coordinates between 0 and 1
+        normalized_points = [[(x / w, y / h) for x, y in points]]
+
+        # Create a Polyline object
+        polyline = fo.Polyline(
+            label=str(lab),
+            points=normalized_points,
+            closed=True,    # Assuming the polygon is closed
+            filled=True,    # Filled polygon
+            hasty_id=r.id,
+            attributes={"custom_attribute": {"bla": "keks"}},
+            tags=["bla", "keks"]
+        )
+
+        polygons.append(polyline)
+    return polygons
 
 
 def debug_hasty_fiftyone(
@@ -153,7 +189,8 @@ def debug_hasty_fiftyone(
 
         hA_image = hA_gt_sample[0]
         keypoints = _create_keypoints_s(hA_image=hA_image)
-        boxes = _create_boxes_s(hA_image=hA_image)
+        # boxes = _create_boxes_s(hA_image=hA_image)
+        #polygons = _create_polygons_s(hA_image=hA_image)
 
         sample = fo.Sample(filepath=image_path,
                            tags=hA_image.tags,
@@ -165,11 +202,15 @@ def debug_hasty_fiftyone(
             sample['ground_truth_points'] = fo.Keypoints(keypoints=keypoints)
         elif type == "boxes":
             sample['ground_truth_boxes'] = fo.Detections(detections=boxes)
+        elif type == "polygons":
+            raise NotImplementedError("Polygons are not yet implemented")
+            # sample['ground_truth_polygons'] = fo.Polylines(polyline=polygons)
         else:
             raise ValueError("Unknown type, use 'boxes' or 'points'")
 
         # sample.save()
         samples.append(sample)
+        logger.info(f"Added {image_path.name} to the dataset")
 
     dataset.add_samples(samples)
 
