@@ -62,17 +62,17 @@ def _create_keypoints_s(hA_image: AnnotatedImage) -> List[fo.Keypoint]:
 
     for r in hA_image.labels:
 
-
         pt = (int(r.incenter_centroid.x) / w, int(r.incenter_centroid.y) / h)
         lab = r.class_name
 
+        # TODO we need to add the attributes to the label, i.e. if the point is a head or a tail
         kp = fo.Keypoint(
             # kind="str",
             hasty_id=r.id,
             label=str(lab),
             points=[pt],
             # attributes=r.attributes,
-            # attributes={"custom_attribute": {"bla": "keks"}},
+            attributes={"custom_attribute": {"bla": "keks"}},
             # tags=["bla", "keks"]
         )
 
@@ -188,8 +188,65 @@ def debug_hasty_fiftyone(
         assert len(hA_gt_sample) == 1, f"There should be one single image left, but {len(hA_gt_sample)} are left."
 
         hA_image = hA_gt_sample[0]
-        keypoints = _create_keypoints_s(hA_image=hA_image)
-        # boxes = _create_boxes_s(hA_image=hA_image)
+        if type == "points":
+            keypoints = _create_keypoints_s(hA_image=hA_image)
+        if type == "boxes":
+            boxes = _create_boxes_s(hA_image=hA_image)
+        #polygons = _create_polygons_s(hA_image=hA_image)
+
+        sample = fo.Sample(filepath=image_path,
+                           tags=hA_image.tags,
+                           hasty_image_id=hA_image.image_id,
+                           hasty_image_name=hA_image.image_name)
+
+
+        if type == "points":
+            sample['ground_truth_points'] = fo.Keypoints(keypoints=keypoints)
+        elif type == "boxes":
+            sample['ground_truth_boxes'] = fo.Detections(detections=boxes)
+        elif type == "polygons":
+            raise NotImplementedError("Polygons are not yet implemented")
+            # sample['ground_truth_polygons'] = fo.Polylines(polyline=polygons)
+        else:
+            raise ValueError("Unknown type, use 'boxes' or 'points'")
+
+        # sample.save()
+        samples.append(sample)
+        logger.info(f"Added {image_path.name} to the dataset")
+
+    dataset.add_samples(samples)
+
+    return dataset
+
+def debug_hasty_fiftyone_v2(
+        images_set = List[Path],
+        # images_dir: Path,
+        annotated_images: List[AnnotatedImage] = None,
+        dataset_name="projection_comparison",
+        type="points"):
+    """
+    Display these annotations in Fifty One
+    :return:
+    """
+
+    # Create an empty dataset, TODO put this away so the dataset is just passed into this
+    dataset = fo.Dataset(dataset_name)
+    dataset.persistent = True
+    # fo.list_datasets()
+
+    # dataset = fo.load_dataset(dataset_name) # loading a bad idea because the single source of truth is the hasty annotations
+    samples = []
+
+    for image_path in images_set:
+
+        hA_gt_sample = [i for i in annotated_images if i.image_name == image_path.name]
+        assert len(hA_gt_sample) == 1, f"There should be one single image left, but {len(hA_gt_sample)} are left."
+
+        hA_image = hA_gt_sample[0]
+        if type == "points":
+            keypoints = _create_keypoints_s(hA_image=hA_image)
+        if type == "boxes":
+            boxes = _create_boxes_s(hA_image=hA_image)
         #polygons = _create_polygons_s(hA_image=hA_image)
 
         sample = fo.Sample(filepath=image_path,

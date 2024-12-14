@@ -25,8 +25,8 @@ from image_template_search.util.util import visualise_image, visualise_polygons
 
 if __name__ == "__main__":
 
-    # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/batch_workflow_report_config_San_STJB01_10012023.yaml")
-    config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/batch_workflow_report_config_Snt_STJB06_12012023.yaml")
+    config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/batch_workflow_report_config_San_STJB01_10012023.yaml")
+    # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/batch_workflow_report_config_Snt_STJB06_12012023.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03/batch_workflow_report_config_FCD01_02_03.yaml")
 
     batched_workflow_report = load_yaml_config(
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     stats_df.to_csv(stats_path, index=False)
 
     print(f"stats of the images set: {stats_df}")
-
+    logger.info(f"Stats written to {stats_path}")
     batched_workflow_report.stats_path = stats_path
 
     persist_file(
@@ -248,17 +248,19 @@ if __name__ == "__main__":
         config=batched_workflow_report
     )
 
+    logger.info(f"Wrote report to: {batched_workflow_report}")
 
-    if cleanup:
-        # Step 6: Cleanup
 
-        ## Delete tasks from CVAT
-        results = view.load_annotation_results(anno_key)
-        results.cleanup()
-
-        ##  Delete run record (not the labels) from FiftyOne
-        dataset.delete_annotation_run(anno_key)
-        fo.delete_dataset(dataset_name)
+    # if cleanup:
+    #     # Step 6: Cleanup
+    #
+    #     ## Delete tasks from CVAT
+    #     results = view.load_annotation_results(anno_key)
+    #     results.cleanup()
+    #
+    #     ##  Delete run record (not the labels) from FiftyOne
+    #     dataset.delete_annotation_run(anno_key)
+    #     fo.delete_dataset(dataset_name)
 
         ## HOW to reconstruct the label cvat dataset
         # labels = [
