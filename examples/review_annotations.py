@@ -41,7 +41,8 @@ def _get_points_and_labels_hA(hA_image: AnnotatedImage) -> tuple[List[tuple[floa
 def _create_keypoints(points: list[tuple[int, int]], labels: list[str]) -> List[fo.Keypoint]:
     keypoints = []
     for pt, lab in zip(points, labels):
-        kp = fo.Keypoint(id="basdas",
+        kp = fo.Keypoint(
+            # id="basdas",
                          kind="str",
                          label=str(lab),
                          points=[pt]
@@ -72,7 +73,7 @@ def _create_keypoints_s(hA_image: AnnotatedImage) -> List[fo.Keypoint]:
             label=str(lab),
             points=[pt],
             # attributes=r.attributes,
-            attributes={"custom_attribute": {"bla": "keks"}},
+            # attributes={"custom_attribute": {"bla": "keks"}},
             # tags=["bla", "keks"]
         )
 
@@ -118,8 +119,8 @@ def _create_boxes_s(hA_image: AnnotatedImage) -> typing.List[fo.Detection]:
             # kind="str",
             hasty_id=r.id,
             # attributes=r.attributes,
-            attributes={"custom_attribute": {"bla": "keks"}},
-            tags=["bla", "keks"]
+            #attributes={"custom_attribute": [{"bla": "keks"}]},
+            #tags=["bla", "keks"]
         )
 
         boxes.append(kp)
@@ -268,6 +269,44 @@ def debug_hasty_fiftyone_v2(
         # sample.save()
         samples.append(sample)
         logger.info(f"Added {image_path.name} to the dataset")
+
+    dataset.add_samples(samples)
+
+    return dataset
+
+
+def debug_hasty_fiftyone_v3(
+        image_path: Path,
+        df_labels: pd.DataFrame,
+        dataset: fo.Dataset
+        ):
+    """
+    Display these annotations in Fifty One
+    :return:
+    """
+    samples = []
+    # points = zip(df_labels["x"], df_labels["y"])
+
+    def get_keypoints(df: pd.DataFrame, kind):
+        tp_keypoints = []
+        for i, r in df[df.kind == kind].iterrows():
+
+            pt = (r["x"] / 5472, r["y"] / 3648) # TODO get this size
+            lab = r["label"]
+            kp = fo.Keypoint(
+                label=str(lab),
+                points=[pt]
+            )
+            tp_keypoints.append(kp)
+        return tp_keypoints
+
+    sample = fo.Sample(filepath=image_path)
+    sample['True Positives'] = fo.Keypoints(keypoints=get_keypoints(df=df_labels, kind="true_positive"))
+    sample['False Positives'] = fo.Keypoints(keypoints=get_keypoints(df=df_labels, kind="false_positive"))
+    sample['False Negatives'] = fo.Keypoints(keypoints=get_keypoints(df=df_labels, kind="false_negative"))
+
+    samples.append(sample)
+    logger.info(f"Added {image_path.name} to the dataset")
 
     dataset.add_samples(samples)
 
