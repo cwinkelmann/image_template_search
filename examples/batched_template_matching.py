@@ -1,3 +1,7 @@
+"""
+Step 2: Batched Template Matching
+"""
+
 import typing
 from dataclasses import asdict
 from datetime import datetime
@@ -39,8 +43,11 @@ if __name__ == "__main__":
 
 
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/batched_workflow_config_Snt_STJB06_12012023.yaml")
-    bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_San_STJB01_10012023.yaml")
+    # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_San_STJB01_10012023.yaml")
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FCD01_02_03.yaml")
+    bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04.yaml")
+
+
     bwc = load_yaml_config(yaml_file_path=bwc_file_path, cls=BatchWorkflowConfiguration)
     hA_projection_images, projection_images, hA_template = init_image_set(bwc)
 

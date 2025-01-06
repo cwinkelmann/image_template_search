@@ -1,3 +1,8 @@
+"""
+Step 1 - Load the configuration
+
+"""
+
 import typing
 from dataclasses import asdict
 from datetime import datetime
@@ -14,14 +19,23 @@ from workflow_iguana_deduplication import workflow_project_single_image_drone_an
 
 def get_config(scenario: str) -> BatchWorkflowConfiguration:
     if scenario == "FMO04_tracking":
+        dataset_name = "FMO04"
+
         base_path = Path(
-            "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04")
+            f"/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/{dataset_name}")
+
+        bwc = BatchWorkflowConfiguration(base_path=base_path,
+                                         dataset_name=dataset_name)
 
         image_url = "https://app.hasty.ai/projects/9d8deceb-77be-47aa-978f-abcbdc8e00f2/image/4db0c13f-692b-4ae5-b4bc-591d314d87e6?datasetId=a37b5089-ece1-42c2-bf4d-db92d2dd3e6c"
         drone_image_path = base_path / "images_2024_10_07/single_images/DJI_0066.JPG"
 
-        orthomosaic_path = base_path / "images_2024_10_07/mosaics/mosaic_100.jpg"  # Metashape
-        # orthomosaic_path =  base_path / "images_2024_10_07/mosaics/FMO04subsetforChris_Orthomosaic_export_TueAug29134421061401.tif" # DroneDeploy
+        orthomosaic_paths = [
+            base_path / "DD_FMO04_Orthomosaic_export_MonFeb12205040089714.tif",  # DroneDeploy
+            base_path / "Pix4D_FMO04-orthomosaic.tiff",  # pix4D
+            base_path / "Metashape-FMO04-orthomosaic.tif",  # metashape
+            base_path / "ODM_FMO04-05-06-03-02-2021-orthophoto.tif"  # ODM
+        ]
 
         # Intermediate data path
         interm_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data")
@@ -38,9 +52,6 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
         hA = hA_from_file(file_path=annotations_file_path)
         hA.images = [i for i in hA.images if i.image_name in [drone_image_path.name]]
         assert len(hA.images) == 1, "There should be only a single image left"
-        drone_image_label = hA.images[0]
-
-        drone_image_label.image_name
 
     elif scenario == "San_STJB01_10012023_DJI_0068":
         dataset_name = "San_STJB01_10012023"
@@ -140,6 +151,7 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
     else:
         raise ValueError("Wrong scenario given")
 
+
     for orthomosaic_path in orthomosaic_paths:
         c = WorkflowConfiguration(
             base_path=base_path,
@@ -162,9 +174,10 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
 
 if __name__ == "__main__":
 
-    scenario = "San_STJB01_10012023_DJI_0068"
+    # scenario = "San_STJB01_10012023_DJI_0068"
     #scenario = "San_STJB06_10012023_DJI_0145"
     #scenario = "FCD01_02_03_DJI_0366"
+    scenario = "FMO04_tracking"
 
     # Get the current date and time
     now = datetime.now()

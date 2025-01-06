@@ -31,12 +31,26 @@ pip install -r requirements.txt
 
 
 ### find a small template image t in a larger image l
+TODO: describe the simple steps a smaller image in a larger image
+There are extension like, projecting annotations too.
 
+Using a stack of images, the following steps are necessary:
+- find nearby imgage
+- match a crop from the primary image to the nearby images
+- (optional) project annotations from the primary image to the nearby images
+- (optional) use annotations on all images to estimate the total amount of objects
+
+#### image comparison workflow
+To evaluate if an orthomosaic matches the quality of a drone image, the following steps are necessary:
+1. config_generation_batch_template_matching.py
+2. batched_template_matching.py
+3. batched_human_in_the_loop.py
+4. batched_calculate_metrics.py
 
 ### create a database of images
 image_database.py
 
-read the metadata of images
+
 
 
 ### image_template_search/detection_deduplication.py

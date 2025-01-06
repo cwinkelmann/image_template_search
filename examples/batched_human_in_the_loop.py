@@ -1,5 +1,5 @@
 """
-download modified annotations from cvat, download them, delete them create a local annotation file
+step 3: find modified annotations from cvat, download them, delete them create a local annotation file
 
 
 """
