@@ -53,7 +53,7 @@ class LabelClass(BaseModel):
     class_type: str
     color: str
     norder: float
-    icon_url: Optional[str]
+    icon_url: Optional[str] = None
     attributes: List[str]
     description: Optional[str]
     use_description_as_prompt: Optional[bool] = False
@@ -76,7 +76,7 @@ class ImageLabel(BaseModel):
     id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='id')
     class_name: str = Field(alias='class_name')
     bbox: Optional[List[int]] = Field(None, alias='bbox')
-    polygon: Optional[List[List[int]]] = Field(default=None)  # A list of points that make up the polygon
+    polygon: Optional[List[typing.Tuple[int, int]]] = Field(default=None)  # A list of points=[x,y] that make up the polygon
     mask: Optional[List[int]] = Field(default=[])
     z_index: Optional[int] = 0
     attributes: dict = Field(default_factory=dict)
@@ -201,6 +201,9 @@ class Attribute(BaseModel):
 
 
 class HastyAnnotationV2(BaseModel):
+    """
+    @deprecated This is a duplicate from the HastyAnnotationV2 object in the biospheredata package
+    """
     project_name: str = Field(alias='project_name')
     create_date: datetime = Field(default=datetime.now())
     export_format_version: str = Field(alias='export_format_version', default="1.1")
