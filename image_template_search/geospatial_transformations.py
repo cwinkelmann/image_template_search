@@ -160,7 +160,7 @@ def convert_to_cog(input_file, output_file):
         "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
         "BIGTIFF": True  # Use BigTIFF format for large files
     }
-
+    logger.info(f"Converting {input_file} to COG")
     # Open the input file
     with rasterio.open(input_file) as src:
         # Copy the input file to a COG with updated options
@@ -181,7 +181,7 @@ def batch_convert_to_cog(input_files, output_dir, max_workers=4):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
         for input_file in input_files:
-            output_file = output_dir / f"{Path(input_file).stem}_cog_pyramids.tif"
+            output_file = output_dir / f"{Path(input_file).stem}.tif"
             futures.append(executor.submit(convert_to_cog, input_file, output_file))
 
         # Wait for all tasks to complete
