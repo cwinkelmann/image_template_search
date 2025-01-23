@@ -73,6 +73,9 @@ class Keypoint(BaseModel):
 
 
 class ImageLabel(BaseModel):
+    """
+    @deprecated This is a duplicate from the ImageLabel object in the biospheredata package
+    """
     id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='id')
     class_name: str = Field(alias='class_name')
     bbox: Optional[List[int]] = Field(None, alias='bbox')
@@ -163,7 +166,8 @@ class AnnotatedImage(BaseModel):
     height: int = Field()
     image_status: Optional[str] = "Done"
     tags: Optional[List[str]] = Field(default=list(), alias='tags')
-    labels: List[ImageLabel]
+
+
     image_mode: Optional[str] = None
 
 

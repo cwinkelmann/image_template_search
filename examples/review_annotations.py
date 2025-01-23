@@ -52,7 +52,7 @@ def _create_keypoints(points: list[tuple[int, int]], labels: list[str]) -> List[
     return keypoints
 
 
-def _create_keypoints_s(hA_image: AnnotatedImage) -> List[fo.Keypoint]:
+def _create_keypoints_s(hA_image: typing.Union[AnnotatedImage]) -> List[fo.Keypoint]:
     """
 
     :param hA_image:

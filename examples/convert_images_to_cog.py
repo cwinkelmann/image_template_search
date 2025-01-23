@@ -17,11 +17,16 @@ output_dir.mkdir(exist_ok=True, parents=True)
 input_base_dir = Path('/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics')
 input_files = list(input_base_dir.glob("*.tif"))
 output_dir = input_base_dir / "cog"
+
+output_files = list(output_dir.glob("*.tif"))
+
+# remove already converted files
+input_files = [f for f in input_files if Path(f).stem not in [Path(f).stem for f in output_files]]
 # for input_file in input_files:
 #     output_file = output_dir / f"{Path(input_file).stem}.tif"
 #     convert_to_cog(input_file, output_file)
 
-batch_convert_to_cog(input_files, output_dir, max_workers=4)
+batch_convert_to_cog(input_files, output_dir, max_workers=2)
 
 
 ### Batch command
