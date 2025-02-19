@@ -14,9 +14,9 @@ output_dir.mkdir(exist_ok=True, parents=True)
 #                Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Scris_SRPB02to05_25012020.tif"),
 #                Path("/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Scris_SRPB06_25012020.tif")]
 
-input_base_dir = Path('/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics')
+input_base_dir = Path('/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/.shortcut-targets-by-id/1u0tmSqWpyjE3etisjtWQ83r3cS2LEk_i/Manual Counting /Drone Deploy orthomosaics')
 input_files = list(input_base_dir.glob("*.tif"))
-output_dir = input_base_dir / "cog"
+output_dir = Path("/Volumes/2TB/Manual_Counting/Orthomosaics")
 
 output_files = list(output_dir.glob("*.tif"))
 
@@ -26,7 +26,7 @@ input_files = [f for f in input_files if Path(f).stem not in [Path(f).stem for f
 #     output_file = output_dir / f"{Path(input_file).stem}.tif"
 #     convert_to_cog(input_file, output_file)
 
-batch_convert_to_cog(input_files, output_dir, max_workers=2)
+batch_convert_to_cog(input_files, output_dir, max_workers=4)
 
 
 ### Batch command

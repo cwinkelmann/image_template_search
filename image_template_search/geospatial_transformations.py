@@ -145,32 +145,36 @@ def save_polygon_as_geojson(polygon: shapely.geometry.Polygon, file_path: Path, 
         json.dump(geojson_data, f)
 
 
-def convert_to_cog(input_file, output_file):
+def convert_to_cog(input_file: Path, output_file: Path):
     """
     Convert a raster to a Cloud-Optimized GeoTIFF (COG)
     :param input_file:
     :param output_file:
     :return:
     """
-    cog_options = {
-        "BLOCKXSIZE": 1024,  # Tile width
-        "BLOCKYSIZE": 1024,  # Tile height
-        "TILED": True,  # Enable tiling
-        "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
-        "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
-        "BIGTIFF": True  # Use BigTIFF format for large files
-    }
-    logger.info(f"Converting {input_file} to COG")
-    # Open the input file
-    with rasterio.open(input_file) as src:
-        # Copy the input file to a COG with updated options
-        copy(
-            src,
-            output_file,
-            driver="COG",
-            **cog_options
-        )
-    logger.info(f"COG saved to {output_file}")
+    if not output_file.exists():
+
+        cog_options = {
+            "BLOCKXSIZE": 1024,  # Tile width
+            "BLOCKYSIZE": 1024,  # Tile height
+            "TILED": True,  # Enable tiling
+            "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
+            "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
+            "BIGTIFF": True  # Use BigTIFF format for large files
+        }
+        logger.info(f"Converting {input_file} to COG")
+        # Open the input file
+        with rasterio.open(input_file) as src:
+            # Copy the input file to a COG with updated options
+            copy(
+                src,
+                output_file,
+                driver="COG",
+                **cog_options
+            )
+        logger.info(f"COG saved to {output_file}")
+    else:
+        logger.info(f"COG already exists: {output_file}")
 
 
 def batch_convert_to_cog(input_files, output_dir, max_workers=4):
