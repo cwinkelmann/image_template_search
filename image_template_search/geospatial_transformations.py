@@ -1,3 +1,5 @@
+import time
+
 import json
 
 import shapely
@@ -163,6 +165,7 @@ def convert_to_cog(input_file: Path, output_file: Path):
             "BIGTIFF": True  # Use BigTIFF format for large files
         }
         logger.info(f"Converting {input_file} to COG")
+        start_ts = time.time()
         # Open the input file
         with rasterio.open(input_file) as src:
             # Copy the input file to a COG with updated options
@@ -172,7 +175,7 @@ def convert_to_cog(input_file: Path, output_file: Path):
                 driver="COG",
                 **cog_options
             )
-        logger.info(f"COG saved to {output_file}")
+        logger.info(f"COG saved to {output_file} in {time.time() - start_ts:.2f} seconds")
     else:
         logger.info(f"COG already exists: {output_file}")
 
@@ -272,3 +275,28 @@ def create_tiles(input_file, output_dir, tile_size=512):
                     dst.build_overviews(overviews, Resampling.average)
                     dst.update_tags(ns="rio_overview", resampling="average")
                 logger.info(f"Saved {tile_file}")
+
+
+
+def get_gsd(geotiff_path):
+    """Calculate the Ground Sampling Distance (GSD) of a GeoTIFF."""
+    with rasterio.open(geotiff_path) as dataset:
+        # The affine transformation provides the pixel size
+        transform = dataset.transform
+
+        # Pixel resolution in x and y direction
+        gsd_x = transform.a  # Width of a pixel (East-West direction)
+        gsd_y = -transform.e  # Height of a pixel (North-South direction, usually negative)
+
+        # CRS info
+        crs = dataset.crs
+        print(f"CRS: {crs}")
+
+    return gsd_x, gsd_y
+
+
+def get_geotiff_compression(geotiff_path):
+    """Extract compression type from a GeoTIFF file."""
+    with rasterio.open(geotiff_path) as dataset:
+        compression = dataset.profile.get('compress', 'None')  # Get compression info
+        return compression
