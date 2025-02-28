@@ -1,34 +1,24 @@
-import time
-
-import json
-
-import shapely
-from pyproj import Proj, transform
-import rasterio
-from rasterio.mask import mask
-from shapely.geometry import Point, box
-from shapely.geometry.geo import mapping
-from shapely.ops import transform
-from pyproj import Transformer
-from pathlib import Path
-
-import shapely
-import rasterio
-from pyproj import Transformer
-from rasterio import CRS
-from rasterio.warp import calculate_default_transform, reproject, Resampling
-
-from pathlib import Path
-import rasterio
-from rasterio.enums import Resampling
-from rasterio.shutil import copy
 from concurrent.futures import ThreadPoolExecutor
 
-from loguru import logger
+import geopandas as gpd
+import json
 import rasterio
-from rasterio.windows import Window
+import shapely
+import time
+import typing
+from loguru import logger
 from pathlib import Path
+from pyproj import Transformer
+from pyproj import transform
+from rasterio import CRS
 from rasterio.enums import Resampling
+from rasterio.shutil import copy
+from rasterio.warp import calculate_default_transform, reproject
+from rasterio.windows import Window
+from shapely.geometry import box
+from shapely.geometry.geo import mapping
+from shapely.ops import transform
+
 
 def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, target_crs = "EPSG:4326"):
     """
@@ -180,16 +170,25 @@ def convert_to_cog(input_file: Path, output_file: Path):
         logger.info(f"COG already exists: {output_file}")
 
 
-def batch_convert_to_cog(input_files, output_dir, max_workers=4):
+def batch_convert_to_cog(input_files: typing.List[Path],
+                         output_files: typing.Optional[typing.List[Path]] = None,
+                         output_dir: typing.Optional[Path] = None,
+                         max_workers=4):
     """Parallelize the conversion of multiple files to COG."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
-        for input_file in input_files:
-            output_file = output_dir / f"{Path(input_file).stem}.tif"
-            futures.append(executor.submit(convert_to_cog, input_file, output_file))
+
+        if output_files is not None:
+            for input_file, output_file in zip(input_files, output_files):
+                # output_file = output_dir / f"{Path(input_file).stem}.tif"
+                futures.append(executor.submit(convert_to_cog, input_file, output_file))
+        else:
+            for input_file in input_files:
+                output_file = output_dir / f"{Path(input_file).stem}.tif"
+                futures.append(executor.submit(convert_to_cog, input_file, output_file))
 
         # Wait for all tasks to complete
         for future in futures:
@@ -208,11 +207,6 @@ def create_universal_grid(extent, cell_size_km, crs="EPSG:32715"):
     Returns:
         GeoDataFrame: A GeoDataFrame containing the grid.
     """
-
-    import geopandas as gpd
-    from shapely.geometry import box
-
-
 
     xmin, ymin, xmax, ymax = extent
     cell_size = cell_size_km * 1000  # Convert km to meters

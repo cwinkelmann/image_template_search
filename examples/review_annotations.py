@@ -220,15 +220,19 @@ def debug_hasty_fiftyone(
     return dataset
 
 def debug_hasty_fiftyone_v2(
-        images_set = List[Path],
-        # images_dir: Path,
-        annotated_images: List[AnnotatedImage] = None,
+        images_set: List[Path],
+        annotated_images: typing.Optional[List[AnnotatedImage]] = None,
         dataset_name="projection_comparison",
         type="points"):
     """
     Display these annotations in Fifty One
     :return:
     """
+    if annotated_images is not None:
+        assert isinstance(annotated_images, list), "annotated_images should be a list"
+        assert len(annotated_images) > 0, "There should be at least one annotated image"
+        isinstance(annotated_images[0], AnnotatedImage)
+        assert all(isinstance(img, AnnotatedImage) for img in annotated_images), "Each item should be an AnnotatedImage object"
 
     # Create an empty dataset, TODO put this away so the dataset is just passed into this
     dataset = fo.Dataset(dataset_name)
@@ -246,9 +250,13 @@ def debug_hasty_fiftyone_v2(
         hA_image = hA_gt_sample[0]
         if type == "points":
             keypoints = _create_keypoints_s(hA_image=hA_image)
-        if type == "boxes":
+        elif type == "boxes":
             boxes = _create_boxes_s(hA_image=hA_image)
-        #polygons = _create_polygons_s(hA_image=hA_image)
+        elif type == "polygons":
+            #polygons = _create_polygons_s(hA_image=hA_image)
+            raise NotImplementedError("Polygons are not yet implemented")
+        else:
+            raise ValueError("Unknown type, use 'boxes' or 'points'")
 
         sample = fo.Sample(filepath=image_path,
                            tags=hA_image.tags,
