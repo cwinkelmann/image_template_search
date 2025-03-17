@@ -501,35 +501,3 @@ def get_exif_metadata(img_path: Path) -> ExtendImageMetaData:
     return exif_meta_data
 
 
-def get_xmp_metadata(img_path: Path) -> XMPMetaData:
-    from libxmp import XMPFiles, consts
-
-    metadata = {}
-
-    try:
-        xmpfile = XMPFiles(file_path=str(img_path), open_forupdate=True)
-        xmp = xmpfile.get_xmp()
-        metadata["format"] = xmp.get_property(consts.XMP_NS_DC, 'format')
-
-        for xmp_key in [
-            "drone-dji:GpsLatitude", "drone-dji:GpsLongitude",
-            "drone-dji:GimbalYawDegree", "drone-dji:GimbalRollDegree",
-            "drone-dji:GimbalPitchDegree",  # the pitch is the inclination with -90 == NADIR and 0 is horizontal
-            "drone-dji:AbsoluteAltitude", "drone-dji:RelativeAltitude",
-            "drone-dji:FlightRollDegree", "drone-dji:FlightYawDegree", "drone-dji:FlightPitchDegree"
-        ]:
-            try:
-                metadata[xmp_key] = float(xmp.get_property("http://www.dji.com/drone-dji/1.0/", xmp_key))
-            except Exception as e:
-                ## with phantom 4, someone wrote the metadata tag wrong: 'drone-dji:GpsLongitude' instead of 'drone-dji:GPSLongitude'
-                logger.error(f"Problem with {xmp_key}, {e}")
-
-    except Exception as e:
-        logger.error(
-            f"Problems with XMP library. Check https://python-xmp-toolkit.readthedocs.io/en/latest/installation.html and propably https://stackoverflow.com/questions/68869984/error-installing-exempi-2-5-2-on-m1-macbook-pro-running-big-sur")
-        logger.error(f"Modify exempi.py f path is None: \
-                        m1_path = '/opt/homebrew/lib/libexempi.dylib' \
-                        if os.path.exists(m1_path): \
-                            path = m1_path")
-        logger.error(e)
-    return metadata
