@@ -18,6 +18,7 @@ from rasterio.windows import Window
 from shapely.geometry import box
 from shapely.geometry.geo import mapping
 from shapely.ops import transform
+from osgeo import gdal
 
 
 def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, target_crs = "EPSG:4326"):
@@ -136,43 +137,108 @@ def save_polygon_as_geojson(polygon: shapely.geometry.Polygon, file_path: Path, 
     with open(file_path, "w") as f:
         json.dump(geojson_data, f)
 
+def warp_to_epsg(input_file: Path, output_file: Path, target_epsg: str, overwrite: bool = False, overviews=(2, 4, 8, 16, 32)):
+    """Reproject raster to target EPSG"""
 
-def convert_to_cog(input_file: Path, output_file: Path):
+    if not output_file.exists() or overwrite:
+
+        logger.info(f"Warping {input_file} to {target_epsg}")
+        start_ts = time.time()
+        gdal.Warp(
+            str(output_file),
+            str(input_file),
+            dstSRS=f"{target_epsg}",
+            resampleAlg="bilinear",
+            format="GTiff",  # temporary GeoTIFF
+            creationOptions=[
+                "TILED=YES",
+                "COMPRESS=DEFLATE",
+                "BIGTIFF=YES",
+                "BLOCKXSIZE=1024",
+                "BLOCKYSIZE=1024"
+            ]
+        )
+        logger.info(f"Warped to {output_file} in {time.time() - start_ts:.2f} seconds")
+
+        ds = gdal.Open("output.tif", gdal.GA_Update)  # Must be in update mode
+        overview_count = ds.GetRasterBand(1).GetOverviewCount()
+        if overview_count == 0 and len(overviews):
+            ds.BuildOverviews("NEAREST", overviews )
+        ds = None  # Close the dataset
+    else:
+        logger.info(f"Warped File already exists: {output_file}")
+
+
+def batch_warp_to_epsg(input_files: typing.List[Path],
+                        target_epsg: str,
+                       output_files: typing.Optional[typing.List[Path]] = None,
+                       output_dir: typing.Optional[Path] = None,
+
+                       overwrite: bool = False,
+                       overviews=(2, 4, 8, 16, 32),
+                       max_workers=4):
+
+    """Parallelize the reprojection of multiple rasters to target EPSG."""
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+
+        if output_files is not None:
+            for input_file, output_file in zip(input_files, output_files):
+                futures.append(executor.submit(warp_to_epsg, input_file, output_file, target_epsg, overwrite, overviews))
+        else:
+            for input_file in input_files:
+                output_file = output_dir / f"{Path(input_file).stem}.tif"
+                futures.append(executor.submit(warp_to_epsg, input_file, output_file, target_epsg, overwrite, overviews))
+
+        # Wait for all tasks to complete
+        for future in futures:
+            future.result()    ,
+
+
+def convert_to_cog(input_file: Path, output_file: Path, overwrite: bool = False):
     """
     Convert a raster to a Cloud-Optimized GeoTIFF (COG)
     :param input_file:
     :param output_file:
     :return:
     """
-    if not output_file.exists():
+    try:
+        if not output_file.exists() or overwrite:
 
-        cog_options = {
-            "BLOCKXSIZE": 1024,  # Tile width
-            "BLOCKYSIZE": 1024,  # Tile height
-            "TILED": True,  # Enable tiling
-            "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
-            "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
-            "BIGTIFF": True  # Use BigTIFF format for large files
-        }
-        logger.info(f"Converting {input_file} to COG")
-        start_ts = time.time()
-        # Open the input file
-        with rasterio.open(input_file) as src:
-            # Copy the input file to a COG with updated options
-            copy(
-                src,
-                output_file,
-                driver="COG",
-                **cog_options
-            )
-        logger.info(f"COG saved to {output_file} in {time.time() - start_ts:.2f} seconds")
-    else:
-        logger.info(f"COG already exists: {output_file}")
+            cog_options = {
+                "BLOCKXSIZE": 1024,  # Tile width
+                "BLOCKYSIZE": 1024,  # Tile height
+                "TILED": True,  # Enable tiling
+                "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
+                "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
+                "BIGTIFF": True  # Use BigTIFF format for large files
+            }
+            logger.info(f"Converting {input_file} to COG")
+            start_ts = time.time()
+            # Open the input file
+            with rasterio.open(input_file) as src:
+                # Copy the input file to a COG with updated options
+                copy(
+                    src,
+                    output_file,
+                    driver="COG",
+                    **cog_options
+                )
+            logger.info(f"COG saved to {output_file} in {time.time() - start_ts:.2f} seconds")
+        else:
+            logger.info(f"COG already exists: {output_file}")
+
+    except rasterio.errors.RasterioIOError as e:
+        logger.error(f"Error converting {input_file} to COG: {e}")
+
 
 
 def batch_convert_to_cog(input_files: typing.List[Path],
                          output_files: typing.Optional[typing.List[Path]] = None,
-                         output_dir: typing.Optional[Path] = None,
+                         output_dir: typing.Optional[Path] = None, overwrite: bool = False,
                          max_workers=4):
     """Parallelize the conversion of multiple files to COG."""
     if output_dir is not None:
@@ -184,11 +250,11 @@ def batch_convert_to_cog(input_files: typing.List[Path],
         if output_files is not None:
             for input_file, output_file in zip(input_files, output_files):
                 # output_file = output_dir / f"{Path(input_file).stem}.tif"
-                futures.append(executor.submit(convert_to_cog, input_file, output_file))
+                futures.append(executor.submit(convert_to_cog, input_file, output_file, overwrite))
         else:
             for input_file in input_files:
                 output_file = output_dir / f"{Path(input_file).stem}.tif"
-                futures.append(executor.submit(convert_to_cog, input_file, output_file))
+                futures.append(executor.submit(convert_to_cog, input_file, output_file, overwrite))
 
         # Wait for all tasks to complete
         for future in futures:
