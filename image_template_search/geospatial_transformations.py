@@ -21,7 +21,10 @@ from shapely.ops import transform
 from osgeo import gdal
 
 
-def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, target_crs = "EPSG:4326"):
+def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, target_crs = "EPSG:4326", resampling_method: str = "cubic",
+                                 compress: str = "lzw",
+                                 tiled: bool = True,
+                                 blocksize: int = 512):
     """
     Project an orthomosaic to a different CRS
     :param orthomosaic_path:
@@ -44,7 +47,11 @@ def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, targ
             "crs": target_crs,
             "transform": transform,
             "width": width,
-            "height": height
+            "height": height,
+            "compress": compress,
+            "tiled": tiled,
+            "blockxsize": blocksize,
+            "blockysize": blocksize
         })
 
         # Open the output file and reproject each band
@@ -57,7 +64,8 @@ def project_orthomsaic(orthomosaic_path: Path, proj_orthomosaic_path: Path, targ
                     src_crs=src.crs,
                     dst_transform=transform,
                     dst_crs=target_crs,
-                    resampling=Resampling.nearest  # Use nearest or another method as needed
+                    resampling=Resampling.cubic,
+                    num_threads=4 # Use nearest or another method as needed
                 )
 
 
@@ -212,7 +220,7 @@ def convert_to_cog(input_file: Path, output_file: Path, overwrite: bool = False)
                 "BLOCKXSIZE": 1024,  # Tile width
                 "BLOCKYSIZE": 1024,  # Tile height
                 "TILED": True,  # Enable tiling
-                "COMPRESS": "DEFLATE",  # Compression type (LZW is common for COGs)
+                "COMPRESS": "LZW",  # Compression type (LZW is common for COGs)
                 "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
                 "BIGTIFF": True  # Use BigTIFF format for large files
             }
