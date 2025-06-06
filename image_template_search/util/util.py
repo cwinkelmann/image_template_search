@@ -143,7 +143,7 @@ def get_similarity_cache_to_disk():
             # Check if cache exists
             if os.path.exists(cache_file) and CacheConfig.caching:
                 # Load cached result
-                logger.info(f"Loading cached result for {image0.stem} and {image1.stem}")
+                logger.info(f"Loading cached result for {image0.stem} and {image1.stem} from {cache_file}")
                 return joblib.load(cache_file)
 
             # Call the function and cache the result
@@ -243,6 +243,7 @@ def visualise_polygons(polygons: List[shapely.Polygon] = (),
     for point in points:
         x, y = point.xy
         ax.plot(x, y, marker='o', color=color, linewidth=linewidth, markersize=markersize)
+    plt.tight_layout()
     if filename:
         plt.savefig(filename)
     if show:
@@ -500,4 +501,25 @@ def get_exif_metadata(img_path: Path) -> ExtendImageMetaData:
     # exif_meta_data = ExifMetaData(**metadata)
     return exif_meta_data
 
+def list_images(path: Path, extension, recursive=False):
+    """
+    find images in a path
 
+    :param extension:
+    :param recursive:
+    :return:
+    :param path:
+    :return:
+    """
+
+    assert extension in ["jpg", "jpeg", "png", "tif", "tiff", "JPG", "JPEG"], f"Unsupported image extension: {extension}"
+
+    if recursive:
+        images_list = list(path.rglob(f"*.{extension}"))
+    else:
+        images_list = list(path.glob(f"*.{extension}"))
+
+    # remove hidden files which are especially annoying on a Mac
+    images_list = [image_path for image_path in images_list if not str(image_path.name).startswith(".")]
+
+    return images_list

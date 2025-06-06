@@ -5,11 +5,7 @@ from pathlib import Path
 
 import shapely
 import rasterio
-from pyproj import Transformer
-from rasterio import CRS
-from rasterio.warp import calculate_default_transform, reproject, Resampling
 
-from image_template_search.geospatial_transformations import create_buffer_box, convert_point_crs
 
 
 

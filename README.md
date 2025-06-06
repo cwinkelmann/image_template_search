@@ -7,7 +7,7 @@ find template images in larger image sets. This allows for the following workflo
 
 ## Installation
 ```bash
-conda create -n image-template-search python=3.11
+conda create -n image_template_search python=3.11
 ```
 install LightGlue first
 
@@ -50,7 +50,9 @@ To evaluate if an orthomosaic matches the quality of a drone image, the followin
 ### create a database of images
 image_database.py
 
-
+### Register two Orthomosaics
+See register_two_orthomosaics.py
+and workflow_register_two_orthomosaics.py
 
 
 ### image_template_search/detection_deduplication.py

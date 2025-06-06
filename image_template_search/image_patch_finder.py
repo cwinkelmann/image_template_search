@@ -17,7 +17,6 @@ from shapely.geometry import Polygon
 
 from conf.config_dataclass import CacheConfig
 from image_template_search.image_rasterization import tile_large_image
-from image_template_search.image_similarity import get_similarity
 from image_template_search.image_similarity import get_similarity, find_rotation_gen_cv2
 from image_template_search.util.projection import project_bounding_box
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher

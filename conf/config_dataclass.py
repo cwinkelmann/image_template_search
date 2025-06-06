@@ -10,7 +10,8 @@ class CacheConfig:
     show_visualisation: bool = False
     device: str = "cpu"
     caching: bool = True
-    max_num_keypoints = 6000 # good number for a 20MP image
+    max_num_keypoints = 4000 # 6000 good number for a 20MP image
+    tile_count = 2 # 2 good number for a 20MP image
     patch_size = 640
     patch_size_offset = 400
     ransac_reproj_threshold = 2

@@ -8,7 +8,7 @@ from typing import Tuple
 
 import PIL.Image
 import cv2
-import kornia as K
+
 import matplotlib.pyplot as plt
 import numpy as np
 import shapely
@@ -55,7 +55,7 @@ def get_similarity_tiled(template_image: Path, image1: Path) -> Tuple[float, tor
     if (image1_T.shape[1] > 1000 and image1_T.shape[2] > 1000 and not torch.all(image1_T == 0)
             and (black_pixels + white_pixels) / total_pixels < 0.5):
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = CacheConfig.device  # 'mps', 'cpu', 'cuda'
         torch.set_grad_enabled(False)
 
         # Extract features from the template image
@@ -217,7 +217,8 @@ def visualise_matches(feats0, feats1, matches01, image0, image1):
 
 @get_similarity_cache_to_disk()
 def get_similarity(template_image: Path,
-                   image1: Path, max_num_keypoints = CacheConfig.max_num_keypoints) -> (float, torch.Tensor, torch.Tensor):
+                   image1: Path, max_num_keypoints = CacheConfig.max_num_keypoints,
+                   tile_count = CacheConfig.tile_count) -> (float, torch.Tensor, torch.Tensor):
     """
     get the similarity between two images
     :param template_image:
@@ -235,7 +236,7 @@ def get_similarity(template_image: Path,
 
     necesary_matches = 100
 
-    N_x = N_y = 2  # TODO evaluate this
+    N_x = N_y = tile_count  # TODO evaluate this
     if img1_width - 1000 > template_width and img1_height - 1000 > template_height:
         N_x = img1_width // template_width
         N_y = img1_height // template_height
@@ -329,7 +330,7 @@ class TiledExtractor:
             y_offset = y_offsets[i]
 
             # Create an offset tensor with the same shape as the coordinates tensor
-            offsets = torch.tensor([x_offset, y_offset])
+            offsets = torch.tensor([x_offset, y_offset]).to(self.device)
 
             features_kp.append(feats1["keypoints"] + offsets)
             if isinstance(self.extractor, SIFT):
@@ -383,6 +384,8 @@ def find_rotation_gen_kornia(m_kpts0: np.ndarray,
     :param image_name: Path to the target image.
     :return: Homography matrix, mask of inliers, and the footprint polygon.
     """
+    import kornia as K
+
     logger.warning("on a ARM (M1,M2,... ) macbook this consumes a lot of memory and is not practical for large images")
     # Convert image path if necessary
     if isinstance(image_name, str):

@@ -117,7 +117,7 @@ class ExifMetaData(BaseModel):
     """
     _exif_ifd_pointer: int
     _gps_ifd_pointer: int
-    bits_per_sample: int
+    bits_per_sample: typing.Optional[int] = None
     body_serial_number: str
     color_space: ColorSpace
     compression: int
