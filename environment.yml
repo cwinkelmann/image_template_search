@@ -1,8 +1,10 @@
 name: image-template-search
+
 channels:
   - conda-forge
   - defaults
 dependencies:
+  - python=3.11
   - pip:
       - exif==1.6.0
       - fiftyone==1.0.1
