@@ -5,13 +5,13 @@ joblib==1.4.2
 
 # Computer Vision
 opencv-python==4.10.0.84
-kornia==0.7.3
-kornia-rs==0.1.5
+# kornia==0.7.3
+# kornia-rs==0.1.5
 
 # FiftyOne ecosystem
-fiftyone==1.0.1
-fiftyone-brain==0.17.0
-fiftyone-db==1.1.7
+# fiftyone==1.0.1
+# fiftyone-brain==0.17.0
+# fiftyone-db==1.1.7
 
 # Geospatial (gdal and geopandas installed via conda)
 shapely==2.0.6
@@ -30,5 +30,5 @@ loguru==0.7.2
 exif==1.6.0
 
 # Development (pytest installed via conda)
-jupyter==1.1.1
-dvc==3.57.0
+# jupyter==1.1.1
+# dvc==3.57.0
