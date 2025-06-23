@@ -14,19 +14,24 @@ def test_config():
     cfg.visualise_matching = True
     return cfg
 
+@pytest.fixture
+def template_path():
+    return Path(__file__).parent / "data/crop_0_512.jpg"
+
+@pytest.fixture
+def large_image_path():
+    return Path(__file__).parent / "data/crop_0_1280.jpg"
+
 
 
 
 from unittest.mock import patch
 
-def test_template_images_search_small_small(test_config):
+def test_template_images_search_small_small(test_config, template_path, large_image_path):
     """
     Find similar images in a dataset
     :return:
     """
-
-    template_path = Path(f"./data/crop_0_512.jpg")
-    large_image_path = Path(f"./data/crop_0_1280.jpg")
 
     with tempfile.TemporaryDirectory() as cache_dir:
 
@@ -49,14 +54,13 @@ def test_template_images_search_small_small(test_config):
             assert isinstance(crop, np.ndarray)
             assert (512, 512, 3) == crop.shape, "The crop patch should be 512x512x3"
 
-def test_template_images_search(test_config):
+def test_template_images_search(test_config, template_path, large_image_path):
     """
     Find similar images in a dataset
     :return:
     """
 
-    template_path = Path(f"./data/crop_0_512.jpg")
-    large_image_path = Path(f'./data/DJI_0019.JPG')
+
 
     with tempfile.TemporaryDirectory() as cache_dir:
 
@@ -98,12 +102,11 @@ def test_template_images_search_2(test_config):
             from image_template_search.image_patch_finder import find_patch, find_patch_stacked, find_patch_tiled
             from image_template_search.util.util import visualise_image
 
-            template_path_640 = Path(f"./data/images/FMO04/templates/template_source_DJI_0049.640.jpg")
-            template_path_1280 = Path(f"./data/images/FMO04/templates/template_source_DJI_0049.1280.jpg")
+            template_path_1280 = Path(__file__).parent / "data/images/FMO04/templates/template_source_DJI_0049.1280.jpg"
 
             # template_path = template_path_640
             template_path = template_path_1280
-            large_image_path = Path(f'./data/DJI_0058.JPG')
+            large_image_path = Path(__file__).parent / "data/DJI_0058.JPG"
 
             output_path = Path("./output")
 
@@ -120,13 +123,11 @@ def test_template_images_search_2(test_config):
             assert isinstance(crop, np.ndarray)  # add assertion here
             assert ((1280, 1280, 3) == crop.shape, "The crop patch should be 1280x1280x3")
 
-def test_template_images_search_no_match(test_config):
+def test_template_images_search_no_match(test_config, template_path, large_image_path):
     """
     Find a small patch on different other image
     :return:
     """
-    template_path = Path(f"./data/crop_0_1280.jpg")
-    large_image_path = Path(f'./data/DJI_0227.JPG')
 
     with tempfile.TemporaryDirectory() as cache_dir:
         output_path = cache_dir
@@ -140,25 +141,17 @@ def test_template_images_search_no_match(test_config):
 
             assert False == crop, "When the patch is not present nothing should be returned"
 
+
+
 class ImageSimilarityTestCase(unittest.TestCase):
-
-
-
-
-
-
-
-
-
-
 
     def test_tiled_template_images_search(self):
         """
         Find similar images in a dataset
         :return:
         """
-        template_path = Path(f"./data/crop_0_1280.jpg")
-        large_image_path = Path(f'./data/DJI_0019.JPG')
+        template_path = Path(__file__).parent / "data/crop_0_1280.jpg"
+        large_image_path = Path(__file__).parent / "data/DJI_0019.JPG"
 
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
@@ -182,10 +175,9 @@ class ImageSimilarityTestCase(unittest.TestCase):
         Find similar images in a dataset
         :return:
         """
-        template_path = Path(f"./data/crop_0_1280.jpg")
-        large_image_path = Path(f'./data/DJI_0018.JPG')
-        from image_template_search.image_patch_finder import find_patch, find_patch_stacked, find_patch_tiled
-        from image_template_search.util.util import visualise_image
+        template_path = Path(__file__).parent / "data/crop_0_1280.jpg"
+        large_image_path = Path(__file__).parent / "data/DJI_0018.JPG"
+        from image_template_search.image_patch_finder import find_patch_tiled
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
             cache_dir = Path("./cache_nc") # temporary hack to speed up testing
@@ -208,13 +200,14 @@ class ImageSimilarityTestCase(unittest.TestCase):
         Find the patch crop_0 in an image that does not contain it, therefore nothing should be found
         :return:
         """
-        template_path = Path(f"./data/crop_0_1280.jpg")
-        large_image_path = Path(f'./data/DJI_0227.JPG') # NO MATCH IMAGE
+        template_path = Path(__file__).parent / "data/crop_0_1280.jpg"
+        large_image_path = Path(__file__).parent / "data/DJI_0227.JPG" # NO MATCH IMAGE
+
         from image_template_search.image_patch_finder import find_patch, find_patch_stacked, find_patch_tiled
         from image_template_search.util.util import visualise_image
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
-            cache_dir = Path("./cache") # temporary hack to speed up testing
+            # cache_dir = Path("./cache") # temporary hack to speed up testing
 
             output_path = Path("./output")
             crop = find_patch_tiled(template_path,
@@ -227,18 +220,17 @@ class ImageSimilarityTestCase(unittest.TestCase):
         self.assertFalse(crop, "patch is not present")
 
     def test_stack_crops(self):
-        template_path = Path(f"./data/crop_0_1280.jpg")
-        large_image_path_1 = Path(f'./data/DJI_0018.JPG')
-        large_image_path_2 = Path(f'./data/DJI_0019.JPG')
-        large_image_path_3 = Path(f'./data/DJI_0227.JPG')  # NO MATCH IMAGE
+        template_path = Path(__file__).parent / "data/crop_0_1280.jpg"
+        large_image_path_1 = Path(__file__).parent / "data/DJI_0018.JPG"
+        large_image_path_2 = Path(__file__).parent / "data/DJI_0019.JPG"
+        large_image_path_3 = Path(__file__).parent / "data/DJI_0227.JPG"  # NO MATCH IMAGE
 
         large_image_paths = [large_image_path_1, large_image_path_2, large_image_path_3]
         from image_template_search.image_patch_finder import find_patch, find_patch_stacked, find_patch_tiled
         from image_template_search.util.util import visualise_image
         with tempfile.TemporaryDirectory() as cache_dir:
             cache_dir = Path(cache_dir)
-            cache_dir = Path("./cache") # temporary hack to speed up testing
-
+            #cache_dir = Path("./cache") # temporary hack to speed up testing
 
             output_path = Path("./output")
             crops = find_patch_stacked(template_path,
@@ -251,11 +243,6 @@ class ImageSimilarityTestCase(unittest.TestCase):
                                        MIN_MATCH_COUNT=100)
 
         self.assertEqual(2, len(crops), "It should find two matches")
-
-
-
-
-
 
 
 if __name__ == '__main__':

@@ -432,7 +432,6 @@ def find_rotation_gen_cv2(m_kpts0: np.ndarray,
     logger.info(f"RANSAC Threshold: {CacheConfig.ransac_reproj_threshold}")
     M, mask = cv2.findHomography(m_kpts0, m_kpts1, cv2.RANSAC, CacheConfig.ransac_reproj_threshold)
 
-    # TODO integrate kornia findHomography in here
     img1 = cv2.imread(str(image_name), cv2.IMREAD_GRAYSCALE)
     h, w = img1.shape
     pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)

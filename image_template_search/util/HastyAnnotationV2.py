@@ -55,7 +55,7 @@ class LabelClass(BaseModel):
     norder: float
     icon_url: Optional[str] = None
     attributes: List[str]
-    description: Optional[str]
+    description: Optional[str] = None
     use_description_as_prompt: Optional[bool] = False
 
 
@@ -157,16 +157,63 @@ class ImageLabel(BaseModel):
         return self.id
 
 
-class AnnotatedImage(BaseModel):
-    image_id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='image_id')
+class ImageLabelCollection(BaseModel):
     image_name: str = Field(alias='image_name', description="Name of the image file")
+    image_id: typing.Union[str, int] = Field(default_factory=lambda: str(uuid.uuid4()), alias='image_id')
+
+    labels: List[typing.Union[ImageLabel]] = Field(...,
+                                                                        description="A list of labels on the image. Can be either ImageLabel or PredictedImageLabel")
+    width: int
+    height: int
+
+    def denormalise(self):
+        """
+        Normalise the labels to the image size
+        :return:
+        """
+        for label in self.labels:
+            if label.bbox is not None:
+                label.bbox = [int(label.bbox[0] * self.width), int(label.bbox[1] * self.height),
+                              int(label.bbox[2] * self.width), int(label.bbox[3] * self.height)]
+
+            if label.polygon is not None:
+                label.polygon = [(int(x * self.width), int(y * self.height)) for x, y in label.polygon]
+
+            if label.mask is not None:
+                label.mask = [int(coord * self.width) for coord in label.mask]
+
+        return self
+
+    def normalise(self):
+        """
+        Normalise the labels to the image size
+        :return:
+        """
+        for label in self.labels:
+            if label.bbox is not None:
+                label.bbox = [label.bbox[0] / self.width, label.bbox[1] / self.height,
+                              label.bbox[2] / self.width, label.bbox[3] / self.height]
+
+            if label.polygon is not None:
+                label.polygon = [(x / self.width, y / self.height) for x, y in label.polygon]
+
+            if label.mask is not None:
+                label.mask = [int(coord / self.width) for coord in label.mask]
+
+        return self
+
+    def save(self, file_path: Path):
+        with open(file_path, 'w') as json_file:
+            # Serialize the list of Pydantic objects to a list of dictionaries
+            json_file.write(self.model_dump_json())
+
+
+class AnnotatedImage(ImageLabelCollection):
     dataset_name: Optional[str] = Field(default=None, alias='dataset_name')
     ds_image_name: Optional[str] = Field(default=None)
-    width: int = Field()
-    height: int = Field()
+
     image_status: Optional[str] = "Done"
     tags: Optional[List[str]] = Field(default=list(), alias='tags')
-
 
     image_mode: Optional[str] = None
 

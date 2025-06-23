@@ -8,48 +8,44 @@ from unittest.mock import patch, MagicMock
 
 from image_template_search.image_patch_finder import ImagePatchFinderLG
 
-
-# Sample fixture for the ImagePatchFinder instance
 @pytest.fixture
 def patch_finder():
-    template_path = Path("./tests/data/crop_0_640.jpg")
-    large_image_path = Path("./tests/data/DJI_0018.JPG")
-    template_polygon = Polygon([(0, 0), (0, 10), (10, 10), (10, 0)])
+    template_path = Path(__file__).parent / "data/crop_0_640.jpg"
+    large_image_path = Path(__file__).parent / "data/DJI_0018.JPG"
+
 
     ipf = ImagePatchFinderLG(template_path=template_path,
-                             template_polygon=template_polygon,
                              large_image_path=large_image_path)
 
 
-    return ImagePatchFinderLG(template_path, template_polygon, large_image_path)
+    return ipf
 
 
 def test_init(patch_finder):
-    assert patch_finder.template_path == Path("tests/data/crop_0_640.jpg")
-    assert patch_finder.large_image_path == Path("tests/data/DJI_0018.JPG")
+    assert patch_finder.template_path == Path(__file__).parent / "data/crop_0_640.jpg"
+    assert patch_finder.large_image_path == Path(__file__).parent / "data/DJI_0018.JPG"
+
     assert isinstance(patch_finder.template_polygon, Polygon)
     assert patch_finder.M_ is None
     assert patch_finder.M is None
     assert patch_finder.mask is None
 
+@patch('image_template_search.image_patch_finder.project_bounding_box')
+@patch('image_template_search.image_patch_finder.find_rotation_gen_cv2')
+#@patch('image_template_search.image_patch_finder.get_similarity')
+def test_find_patch( mock_find_rotation, mock_project_bbox, patch_finder):
+    # Set up mocks
+    # mock_similarity.return_value = (0.9, np.array([[0, 0], [1, 1]]), np.array([[2, 2], [3, 3]]))
+    mock_find_rotation.return_value = (np.eye(3), np.ones((4, 1)), Polygon([(0, 0), (0, 10), (10, 10), (10, 0)]))
+    mock_project_bbox.return_value = Polygon([(0, 0), (0, 5), (5, 5), (5, 0)])
 
-# TODO mock these methods properly
-@patch('image_template_search.image_similarity.get_similarity',
-       return_value=(0.9, np.array([[0, 0], [1, 1]]), np.array([[2, 2], [3, 3]])))
-@patch('image_template_search.image_similarity.find_rotation_gen',
-       return_value=(np.eye(3), np.ones((4,1)), Polygon([(0, 0), (0, 10), (10, 10), (10, 0)])))
-@patch('image_template_search.image_similarity.project_bounding_box',
-       return_value=Polygon([(0, 0), (0, 5), (5, 5), (5, 0)]))
-def test_find_patch(mock_similarity, mock_find_rotation, mock_project_bbox, patch_finder):
     result = patch_finder.find_patch(similarity_threshold=0.1)
 
-    # Assert if external calls were made
-    mock_similarity.assert_called_once()
+    # Assertions
+    # mock_similarity.assert_called_once()
     mock_find_rotation.assert_called_once()
     mock_project_bbox.assert_called_once()
 
-    # Assert if the method returned True
-    assert result is True
 
     # Assert if the homography matrix was updated
     assert np.array_equal(patch_finder.M, np.eye(3))

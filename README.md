@@ -25,6 +25,12 @@ pip install -e .
 Then install the requirements
 ```bash
 pip install -r requirements.txt
+
+# run the tests
+pytest tests
+```
+
+Finally, install the image_template_search package
 ```
 
 ## Example Workflows

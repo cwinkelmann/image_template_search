@@ -184,7 +184,6 @@ def cutout_detection_deduplication(source_image_path: Path,
         logger.info(f"finding template patch in {large_image.image_name}")
 
         ipf = ImagePatchFinderLG(template_path=source_image_path,
-                                 template_polygon=cutout_polygon,
                                  large_image_path=images_path / large_image.dataset_name / large_image.image_name)
 
 
@@ -224,7 +223,6 @@ def cutout_detection_deduplication(source_image_path: Path,
                     plt.close(ax_i.figure)
 
                 ipf_t = ImagePatchFinderLG(template_path=template_image_path,
-                                           template_polygon=cutout_polygon,
                                            large_image_path=images_path / large_image.dataset_name / large_image.image_name)
 
                 if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:

@@ -24,7 +24,6 @@ def project_image(M, template_path, large_image_path, output_path,
     :param visualise:
     :return:
     """
-    # TODO class variable
     M_ = np.linalg.inv(M)
 
     template_image = Image.open(
@@ -55,7 +54,7 @@ def project_image(M, template_path, large_image_path, output_path,
 def project_bounding_box(label: typing.Union[Polygon, ImageLabel], M: np.ndarray) -> typing.Union[Polygon, ImageLabel]:
     """
     Project a Shapely bounding box from Image A to Image B using the cv2 perspectiveTransform function.
-    # TODO project this so we can project points, lines and polygons
+
     :param bbox_a: Bounding box in Image A (as a Shapely Polygon)
     :param M: 3x3 perspective transformation matrix
     :return: Transformed bounding box in Image B (as a Shapely Polygon)
