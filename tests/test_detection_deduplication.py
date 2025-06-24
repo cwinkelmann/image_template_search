@@ -35,8 +35,45 @@ def images_path():
 def output_path():
     return Path(__file__ ).parent / "output/cutouts/"
 
+import tempfile
+import unittest
+from pathlib import Path
+from time import sleep
+
+import numpy as np
+
+from conf.config_dataclass import CacheConfig
+import pytest
+from unittest.mock import patch
+
+from image_template_search.image_patch_finder import ImagePatchFinderLG
+from image_template_search.types.exceptions import DetailedNoMatchError
+from image_template_search.util.util import visualise_polygons
+from image_template_search.util.util import visualise_image
+
+
+@pytest.fixture
+def test_config():
+    cfg = CacheConfig()
+    cfg.visualise = False
+    cfg.visualise_matching = False
+    cfg.visualise_info = False
+    cfg.show_visualisation = False
+    return cfg
+
+@pytest.fixture
+def test_config_vis():
+    cfg = CacheConfig()
+    cfg.visualise = True
+    cfg.visualise_matching = True
+    cfg.visualise_info = True
+    cfg.show_visualisation = True
+    return cfg
+
+
 def test_find_annotated_template_matches(hA: HastyAnnotationV2,
-                                         images_path: Path
+                                         images_path: Path,
+                                         test_config_vis
                                          ):
     """
 
@@ -45,40 +82,43 @@ def test_find_annotated_template_matches(hA: HastyAnnotationV2,
     :return:
     """
 
-    source_image = hA.images[0]  # take the first image as the template
-    other_images = hA.images[1:]  # take the next two images as the other images we are looking for annotations in
+    hA_source_image = hA.images[0]  # take the first image as the template
+    hA_other_images = hA.images[1:]  # take the next two images as the other images we are looking for annotations in
 
-    assert len(other_images) == 2, "There are two other images"
+    assert len(hA_other_images) == 2, "There are two other images"
 
     patch_size = 1280
 
     with tempfile.TemporaryDirectory() as output_path:
         output_path = Path(output_path)
 
-        ## Re-Identify the objects form the source image in the other images
-        image_stacks = find_annotated_template_matches(
-            images_path,
-            source_image,
-            other_images,
-            output_path,
-            patch_size=patch_size)
+        test_config_vis.cache_path = Path(output_path)
 
-        assert len(image_stacks) == 2, "There are two distinct templates with one object each"
+        with patch('conf.config_dataclass.get_config', return_value=test_config_vis) as mock_get_config:
+            ## Re-Identify the objects form the source image in the other images
+            image_stacks = find_annotated_template_matches(
+                images_path,
+                hA_source_image,
+                hA_other_images,
+                output_path,
+                patch_size=patch_size)
 
+            assert len(image_stacks) == 2, "There are two distinct templates with one object each"
 
-        # How many objects are covered in the two images?
-        image_stacks
+            # How many objects are covered in the two images?
+            image_stacks
 
-        assert len(image_stacks[0].covered_templates) == 3, "Template image + 2 other images"
-        assert len(image_stacks[0].covered_templates[0].labels) == 1, "One object in the template 0 region"
-        assert len(image_stacks[0].covered_templates[1].labels) == 1, "One object in the template 0 region"
-        assert len(image_stacks[0].covered_templates[2].labels) == 1, "One object in the source image template 0 region"
+            assert len(image_stacks[0].covered_templates) == 3, "Template image + 2 other images"
+            assert len(image_stacks[0].covered_templates[0].labels) == 1, "One object in the template 0 region"
+            assert len(image_stacks[0].covered_templates[1].labels) == 1, "One object in the template 0 region"
+            assert len(
+                image_stacks[0].covered_templates[2].labels) == 1, "One object in the source image template 0 region"
 
-        # TODO visualise the three images including the annotations
-        # visualise_image(template_image_path, show=True,
-        #                 title="Template from the Source image")
-        visualise_image(output_path / image_stacks[0].covered_templates[0].image_name, show=True,
-                        title="Warped Template from the other image")
+            # TODO visualise the three images including the annotations
+            # visualise_image(template_image_path, show=True,
+            #                 title="Template from the Source image")
+            visualise_image(output_path / image_stacks[0].covered_templates[0].image_name, show=True,
+                            title="Warped Template from the other image")
 
 
 def test_find_annotated_template_matches_only(hA: HastyAnnotationV2,
@@ -110,8 +150,11 @@ def test_find_annotated_template_matches_only(hA: HastyAnnotationV2,
 
 
 
-def test_cutout_detection_deduplication(hA, source_image_path, template_image_path,
-                                        images_path, output_path):
+def test_cutout_detection_deduplication(hA,
+                                        source_image_path,
+                                        template_image_path,
+                                        images_path,
+                                        output_path):
     """
 
     :param hA:
@@ -153,15 +196,16 @@ def test_cutout_detection_deduplication(hA, source_image_path, template_image_pa
         generated_files = {f.name for f in output_path.glob("*")}
         assert len(generated_files) == 8
 
-        assert generated_files == {'annotations_large_DJI_0052.JPG_template_source_DJI_0049.1280.jpg',
-             'annotations_large_DJI_0063.JPG_template_source_DJI_0049.1280.jpg',
-             'cropped_DJI_0052.JPG_template_source_DJI_0049.1280_1_objects.jpg',
-             'cropped_DJI_0063.JPG_template_source_DJI_0049.1280_1_objects.jpg',
-             'warped_source_DJI_0049_match_DJI_0052.jpg',
-             'warped_source_DJI_0049_match_DJI_0063.jpg',
-             'warped_source_template_source_DJI_0049.1280_match_DJI_0052.jpg',
-             'warped_source_template_source_DJI_0049.1280_match_DJI_0063.jpg'
-                                   }
+        assert generated_files == {
+            'annotations_large_DJI_0052.JPG_template_source_DJI_0049.1280.jpg',
+            'annotations_large_DJI_0063.JPG_template_source_DJI_0049.1280.jpg',
+            'cropped_DJI_0052.JPG_template_source_DJI_0049.1280_1_objects.jpg',
+            'cropped_DJI_0063.JPG_template_source_DJI_0049.1280_1_objects.jpg',
+            'warped_source_DJI_0049_match_DJI_0052.jpg',
+            'warped_source_DJI_0049_match_DJI_0063.jpg',
+            'warped_source_template_source_DJI_0049.1280_match_DJI_0052.jpg',
+            'warped_source_template_source_DJI_0049.1280_match_DJI_0063.jpg'
+        }
 
         if CacheConfig.visualise_info:
             visualise_image(template_image_path, show=True,

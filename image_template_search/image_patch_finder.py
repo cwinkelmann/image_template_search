@@ -21,6 +21,7 @@ from image_template_search.image_similarity import get_similarity, find_rotation
 from image_template_search.util.projection import project_bounding_box
 from image_template_search.opencv_findobject_homography import _cached_detect_and_compute, _matcher
 from image_template_search.util.util import get_image_dimensions
+from image_template_search.types.exceptions import NoMatchError, DetailedNoMatchError
 
 
 # Import your existing functions and classes
@@ -205,7 +206,7 @@ def find_patch_tiled(template_path: Path,
         # draw the matches outer box
         footprint = np.int32(dst.reshape(4, 2))
 
-        if False:
+        if visualise:
             ## TODO create the footprint from that
             footprint = shapely.Polygon(footprint.reshape(4, 2))
 
@@ -242,8 +243,8 @@ def find_patch_tiled(template_path: Path,
 
 
     else:
-        logger.error("Not enough good matches are found - %d/%d" % (len(good), MIN_MATCH_COUNT))
-        return False
+        logger.error(f"Not enough good matches are found - {len(good)}/{MIN_MATCH_COUNT}")
+        raise DetailedNoMatchError(f"Not enough good matches are found - {len(good)}/{MIN_MATCH_COUNT}", large_image_path=large_image_path, template_path=template_path)
 
 
 class ImagePatchFinderCV(object):
@@ -378,10 +379,10 @@ class ImagePatchFinderLG(object):
 
     def find_patch(self,
                    output_path=Path("./output"),
-                   similarity_threshold=0.05):
+                   similarity_threshold=0.05) :
         """
         Find the template in the large image using LightGlue https://github.com/cvg/LightGlue and SIFT
-        TODO: when the template is too small it is not working well. There is no method of identifying if a match is right or not
+        when the template is too small it is not working well. There is no method of identifying if a match is right or not
         :param similarity_threshold:
         :param template_path:
         :param large_image_path:
@@ -395,7 +396,7 @@ class ImagePatchFinderLG(object):
             logger.warning(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
             logger.info(f"normalised_sim: {normalised_sim}, len(m_kpts0): {len(m_kpts0)}, len(m_kpts1): {len(m_kpts1)}")
 
-            raise ValueError(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
+            raise NoMatchError(f"The template {self.template_path.stem} is not in the image {self.large_image_path.stem}")
 
         if not isinstance(output_path, Path):
             output_path = Path(output_path)
@@ -417,14 +418,13 @@ class ImagePatchFinderLG(object):
         self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
         logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
 
-        return True
 
-    def project_image(self, output_path):
+    def project_image(self, output_path) -> Path:
         """
         Project large image to the footprint of the template image
         :return:
         """
-
+        assert self.template_path.exists()
         template_image = cv2.imread(str(self.template_path))
         self.template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
 
@@ -535,15 +535,14 @@ def find_patch(template_path: Path,
         return rotated_cropped_image_bbox, footprint
     else:
         logger.error(f"Template {template_path} not found in {large_image_path}")
-        return False, False
+        raise DetailedNoMatchError("Template not in image.", template_path, large_image_path)
 
 
-def find_patch_stacked(template_path, large_image_paths, output_path,
-                       tile_path, cache_path, MIN_MATCH_COUNT=50,
-                       tile_size_x=1500, tile_size_y=1500,
-                       visualise=False):
+def find_patch_stacked(template_path,
+                       large_image_paths,
+                       output_path):
     """
-    find a crop in multiple other images
+    find a crop in multiple other images.
 
     :param template_path:
     :param large_image_paths:
@@ -557,19 +556,28 @@ def find_patch_stacked(template_path, large_image_paths, output_path,
 
     for large_image_path in large_image_paths:
         logger.info(f"finding patch in {large_image_path}")
-        crop = find_patch_tiled(template_path,
-                                large_image_path,
-                                output_path=output_path,
-                                cache_path=cache_path,
-                                MIN_MATCH_COUNT=MIN_MATCH_COUNT,
-                                tile_size_x=tile_size_x, tile_size_y=tile_size_y, visualise=False)
 
-        if isinstance(crop, np.ndarray):
-            crops.append(crop)
-            im = PIL.Image.fromarray(crop)
-            im.save(output_path / f"crop_{large_image_path.stem}_t_{template_path.stem}.jpeg")
-        else:
-            # no match
-            pass
+        try:
+            ipf = ImagePatchFinderLG(template_path=template_path, large_image_path=large_image_path)
+            ipf.find_patch(output_path=output_path)
+            ipf.project_image(output_path=output_path)
+
+
+            # crop = find_patch_tiled(template_path,
+            #                         large_image_path,
+            #                         output_path=output_path,
+            #                         cache_path=cache_path,
+            #                         MIN_MATCH_COUNT=MIN_MATCH_COUNT,
+            #                         tile_size_x=tile_size_x, tile_size_y=tile_size_y, visualise=False)
+
+            if isinstance(ipf.warped_image_B, np.ndarray):
+                crops.append(ipf.warped_image_B)
+                im = PIL.Image.fromarray(ipf.warped_image_B)
+                im.save(output_path / f"crop_{large_image_path.stem}_t_{template_path.stem}.jpeg")
+            else:
+                # no match
+                pass
+        except NoMatchError as e:
+            logger.warning(f"patch not found in {large_image_path}")
 
     return crops

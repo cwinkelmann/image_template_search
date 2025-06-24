@@ -31,7 +31,7 @@ pytest tests
 ```
 
 Finally, install the image_template_search package
-```
+
 
 ## Example Workflows
 

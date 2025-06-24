@@ -107,4 +107,4 @@ for i, a in enumerate(anno):
 
         print(f"IDs iguanas: {sorted(df_hA_single['ID'].unique())}")
 
-logger.info(f"Model Estimattion: There are {sum(stacks)} Object in there in total")
+logger.info(f"Model Estimation: There are {sum(stacks)} Object in there in total")
