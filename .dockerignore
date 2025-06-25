@@ -1,0 +1,9 @@
+data
+LightGlue
+cache
+similarity_cache
+venv
+output
+.dvc
+.cadence
+examples

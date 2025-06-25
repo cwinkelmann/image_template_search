@@ -73,27 +73,16 @@ def convert_point_crs(point: shapely.Point, target_crs: str, source_crs: str = "
     """
     Convert a point from one CRS to another
     :param point: shapely.Point
-    :param source_crs: str
+    :param source_crs: str (default: "EPSG:4326")
     :param target_crs: str
     :return: shapely.Point
     """
 
+    # Transformer for source CRS to target CRS
+    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
 
-    """
-    Clip an orthomosaic by a location and buffer size
-
-    :param location: tuple (lat, lon)
-    :param orthomosaic_path: Path to orthomosaic
-    :param buffer_size: Buffer size in meters
-    :return: Path to clipped orthomosaic
-    """
-
-    # Transformer for EPSG:4326 to EPSG:32715
-    transformer_to_32715 = Transformer.from_crs(source_crs, target_crs, always_xy=True)
-    transformer_to_4326 = Transformer.from_crs(target_crs, source_crs, always_xy=True)
-
-    # Project the point to EPSG:32715
-    projected_point = transform(transformer_to_32715.transform, point)
+    # Project the point to target CRS
+    projected_point = transform(transformer.transform, point)
 
     return projected_point
 

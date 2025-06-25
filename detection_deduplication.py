@@ -1,4 +1,6 @@
 """
+Deduplicate detections in images by finding matching objects in other images.
+
 
 """
 
@@ -16,7 +18,7 @@ from matplotlib import pyplot as plt
 from shapely import Polygon
 
 
-from conf.config_dataclass import CacheConfig
+from conf.config_dataclass import get_config
 from image_template_search.util.projection import project_bounding_box, project_annotations_to_crop
 from image_template_search.image_patch_finder import ImagePatchFinderLG
 from image_template_search.util.CoveredObjectType import CoveredObject
@@ -167,7 +169,7 @@ def cutout_detection_deduplication(source_image_path: Path,
     :param output_path:
     :param images_path:
     :param other_images:
-    :param template_labels: # TODO add these optional labels to the code
+    :param template_labels:
     :param cutout_polygon:
     :param source_image_path:
     :param template_image:
@@ -177,14 +179,11 @@ def cutout_detection_deduplication(source_image_path: Path,
 
     logger.info(f"Looking for these objects in {[l.attributes['ID'] for l in template_labels]} images")
 
-
     for dest_image in other_images:
-        # FIXME this is a bit of a hack, because this image should not be changed, but somewhere it is
         large_image = copy.deepcopy(dest_image)
         logger.info(f"finding template patch in {large_image.image_name}")
 
         ipf = ImagePatchFinderLG(template_path=source_image_path,
-                                 template_polygon=cutout_polygon,
                                  large_image_path=images_path / large_image.dataset_name / large_image.image_name)
 
 
@@ -211,20 +210,19 @@ def cutout_detection_deduplication(source_image_path: Path,
                 # project B annotations to template
                 large_image_proj_labels = [project_bounding_box(l, ipf.M_) for l in copy.deepcopy(large_image.labels)]
 
-                if CacheConfig.visualise_info:
+                if get_config().visualise_info:
                     ax_i = visualise_image(image=ipf.warped_image_B, show=False, title=f"Warped with annotations {large_image.image_name}",
                                            dpi=75)
                     ax_i = visualise_polygons([ipf.template_polygon], color="white",
                                               ax=ax_i, linewidth=2.5)
                     ax_i = visualise_polygons([l.bbox_polygon for l in large_image_proj_labels], color="red",
-                                              show=CacheConfig.show_visualisation,
+                                              show=get_config().show_visualisation,
                                               ax=ax_i,
                                               linewidth=2.5,
                                               filename=output_path / f"annotations_large_{large_image.image_name}_{template_image_path.stem}.jpg")
                     plt.close(ax_i.figure)
 
                 ipf_t = ImagePatchFinderLG(template_path=template_image_path,
-                                           template_polygon=cutout_polygon,
                                            large_image_path=images_path / large_image.dataset_name / large_image.image_name)
 
                 if len([l for l in large_image_proj_labels if cutout_polygon.contains(l.centroid)]) == 0:
@@ -252,7 +250,7 @@ def cutout_detection_deduplication(source_image_path: Path,
                         [l for l in large_image_proj_labels if frame_polygon.contains(l.centroid)]
 
 
-                    if CacheConfig.visualise_info:
+                    if get_config().visualise_info:
 
                         ax_c = visualise_image(image_path=warped_path,
                                                show=False,
@@ -260,7 +258,7 @@ def cutout_detection_deduplication(source_image_path: Path,
                                                dpi=75)
 
                         ax_c = visualise_polygons([c.bbox_polygon for c in large_image_labels_containing],
-                                                  color="red", show=CacheConfig.show_visualisation, ax=ax_c,
+                                                  color="red", show=get_config().show_visualisation, ax=ax_c,
                                                   linewidth=4.5,
                                                   filename=output_path / f"cropped_{large_image.image_name}_{template_image_path.stem}_{len(large_image_labels_containing)}_objects.jpg")
 
@@ -281,10 +279,6 @@ def cutout_detection_deduplication(source_image_path: Path,
     return covered_objects
 
 
-
-
-
-
 def find_annotated_template_matches(images_path: Path,
                                     source_image: AnnotatedImage,
                                     other_images: list[AnnotatedImage],
@@ -301,6 +295,7 @@ def find_annotated_template_matches(images_path: Path,
     :return:
     """
     # typing list of Image
+
     covered_objects: typing.List[CoveredObject] = []
     logger.info(f"Looking for objects in {source_image.image_name}, {[l.attributes['ID'] for l in source_image.labels]}")
 
@@ -322,7 +317,7 @@ def find_annotated_template_matches(images_path: Path,
     templates = crop_templates_from_image(image=p_image,
                                           bbox_polygons=template_extents)
 
-    if CacheConfig.visualise:
+    if get_config().visualise:
         bd_th = int(patch_size // 2)
 
         center_polygon = Polygon([(0 + bd_th, bd_th), (source_image.width - bd_th, bd_th),
@@ -344,7 +339,7 @@ def find_annotated_template_matches(images_path: Path,
                                 ax=ax, color="blue", linewidth=4.5)
         ax = visualise_polygons([x.bbox_polygon for x in uncovered_labels],
                                 labels=[x.attributes["ID"] for x in uncovered_labels],
-                                ax=ax, color="green", linewidth=4.5, show=CacheConfig.show_visualisation,
+                                ax=ax, color="green", linewidth=4.5, show=get_config().show_visualisation,
                                 filename=output_path / f"template_extents_{source_image.image_name}.jpg")
 
         plt.close(ax.figure)
@@ -358,18 +353,21 @@ def find_annotated_template_matches(images_path: Path,
 
         template_id = get_template_id(image_name=source_image.image_name, combined_hash=combined_hash, patch_size=patch_size)
         template_image_path = output_path / f"template_source_{template_id}.jpg"
+
+
+
         t.save(template_image_path)  # save the template
 
         template_image_ann = AnnotatedImage(image_name=template_image_path.name,
                                             height=t.height, width=t.width,
                                             labels=objs_in_template[i])
-        if CacheConfig.visualise_info:
+        if get_config().visualise_info:
             ax_q = visualise_image(image=t, show=False,
                                    title=f"New Objects_{source_image.image_name} template:{i} with annotations:{len(objs_in_template[i])}")
             visualise_polygons([x.bbox_polygon for x in objs_in_template[i]], color="blue",
                                labels=[x.attributes["ID"] for x in objs_in_template[i]],
                                filename=output_path / f"template_ann_{source_image.image_name}_{i}.jpg",
-                               show=CacheConfig.show_visualisation, ax=ax_q, linewidth=4.5)
+                               show=get_config().show_visualisation, ax=ax_q, linewidth=4.5)
 
             plt.close(ax_q.figure)
 
@@ -407,13 +405,15 @@ def find_annotated_template_matches(images_path: Path,
 
 def demo_template():
     """
-    take detections, look for those on other images
+    take detections, look for those on other images,
+    deduplicate them and save the cutouts
     :return:
     """
     hA = hA_from_file(
-        file_path=Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/labels_2024_10_28.json"))
-    images_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/images_2024_10_07/")
-    output_path = Path("/Users/christian/data/2TB/ai-core/data/detection_deduplication/cutouts/")
+        file_path=Path("/Users/christian/Downloads/detection_deduplication/labels_2024_10_28.json"))
+    images_path = Path("/Users/christian/Downloads/detection_deduplication/images_2024_10_07/")
+    output_path = Path("/Users/christian/Downloads/detection_deduplication/cutouts/")
+    output_path.mkdir(parents=True, exist_ok=True)
 
     known_labels = []
     patch_size = 1280 # with less than 1280 the matching doesn't work
@@ -427,7 +427,7 @@ def demo_template():
 
     hA.images = [i for i in hA.images if i.image_name in [
                             "DJI_0049.JPG",
-       # "DJI_0050.JPG",
+       "DJI_0050.JPG",
        #  "DJI_0051.JPG",
        #                  "DJI_0052.JPG",
        #  "DJI_0053.JPG",
@@ -510,7 +510,7 @@ def demo_template():
             output_path,
             patch_size=patch_size)
 
-        # TODO is this actually what it should.
+        # TODO is this actually doing what it should ?
         stack_annotations = persist_image_stacks(covered_objects, label_classes=hA.label_classes, output_path=output_path)
 
         # since labels from other images are projected back to the template image, we can use their ids and remove them from the next images

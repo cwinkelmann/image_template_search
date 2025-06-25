@@ -87,8 +87,10 @@ def drone_template_orthomosaic_localization(template_image_path: Path, large_ima
     height = 3648
     template_extent = Polygon([(0, 0), (width, 0), (width, height), (0, height)])
 
-    # FIXME the objects should not be grouped together. Each object needs to extracted individually. It is not about the
-    # counting but correct projection of the label-coordinates
+    """
+    FIXME the objects should not be grouped together. Each object needs to extracted individually. It is not about the
+    counting but correct projection of the label-coordinates
+    """
     template_annotations, template_extents, cropped_annotations = find_objects_individual_all(drone_image_labels,
                                                                                          patch_size=CacheConfig.patch_size,
                                                                                               image_width=width,
@@ -260,7 +262,7 @@ def forward_template_matching_projection(
     """
     covered_objects = []
     source_image_labels = source_image_label.labels
-    logger.info(f"Looking for these objects in {[l.attributes.get('ID', None) for l in source_image_labels]} images")
+    logger.info(f"Looking for these objects:  {[l.attributes.get('ID', None) for l in source_image_labels]} in other images")
     logger.info(f"finding template patch {source_image_path.stem} in {source_image_path.stem}")
 
     with Image.open(source_image_path) as img:

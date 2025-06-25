@@ -1,0 +1,67 @@
+# Use miniconda as base image
+FROM continuumio/miniconda3:latest
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV CONDA_AUTO_UPDATE_CONDA=false
+
+# Create conda environment with Python 3.11
+RUN conda create -n myenv python=3.11 -y
+
+# Make RUN commands use the new environment
+SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
+
+# Install packages via conda (much easier for GDAL!)
+RUN conda install -n myenv -c conda-forge \
+    gdal \
+    rasterio \
+    geopandas \
+    shapely \
+    fiona \
+    pyproj \
+    numpy \
+    scipy \
+    scikit-learn \
+    scikit-image \
+    opencv \
+    pillow \
+    matplotlib \
+    seaborn \
+    tqdm \
+    pytest \
+    pytest-cov \
+    jupyter \
+    notebook \
+    -y
+
+# Install PyTorch via conda (CPU version)
+# RUN conda install -n myenv pytorch torchvision torchaudio cpuonly -c pytorch -y
+
+# Clean up conda cache
+RUN conda clean -afy
+
+# Set working directory
+WORKDIR /app
+
+## Copy requirements file if you have additional pip packages
+#COPY requirements-conda.txt* ./
+#
+## Install any additional pip packages if needed
+#RUN if [ -f requirements-conda.txt ]; then pip install -r requirements-conda.txt; fi
+
+# Make sure conda environment is activated
+ENV PATH=/opt/conda/envs/myenv/bin:$PATH
+
+# Copy application code
+# COPY . .
+
+# Install your package if setup.py exists
+RUN if [ -f setup.py ]; then pip install -e .; fi
+
+# Test installation
+# RUN python -c "from osgeo import gdal; import torch; import numpy as np; print(f'GDAL: {gdal.__version__}, PyTorch: {torch.__version__}, NumPy: {np.__version__}')"
+
+# Default command
+CMD ["python", "-c", "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}'); print('Container ready!')"]
+
+# docker run -v $(pwd)/:/app/ python-gdal_conda:latest
