@@ -24,14 +24,7 @@ def test_config():
     cfg.show_visualisation = False
     return cfg
 
-@pytest.fixture
-def test_visu_config():
-    cfg = CacheConfig()
-    cfg.visualise = True
-    cfg.visualise_matching = True
-    cfg.visualise_info = True
-    cfg.show_visualisation = True
-    return cfg
+# Removed unused test_visu_config fixture
 
 @pytest.fixture
 def template_path():
