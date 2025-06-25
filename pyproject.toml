@@ -1,7 +1,7 @@
 [project]
 name = "image_template_search"
 description = """ Collection of tools to use the homography of image and a modified approach of template matching to track object across overapping images"""
-version = "0.0"
+version = "0.1"
 authors = [
     {name = "Christian Winkelmann"},
 ]
