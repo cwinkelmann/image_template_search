@@ -13,14 +13,14 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
-urls = {Repository = "https://github.com/cvg/LightGlue/"}
+urls = {Repository = "https://github.com/yourusername/image_template_search/"}
 dynamic = ["dependencies"]
 
 [project.optional-dependencies]
 dev = ["black==23.12.1", "flake8", "isort", "pytest"]
 
 [tool.setuptools]
-packages = ["lightglue"]
+packages = ["image_template_search"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
