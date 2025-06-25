@@ -57,6 +57,11 @@ COPY requirements.txt .
 # Install Python requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY requirements-dev.txt .
+
+# Install Python requirements
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
 # Copy application code
 # COPY . .
 
