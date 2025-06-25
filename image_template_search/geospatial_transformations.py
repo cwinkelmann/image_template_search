@@ -197,7 +197,44 @@ def batch_warp_to_epsg(input_files: typing.List[Path],
 
 def convert_to_cog(input_file: Path, output_file: Path, overwrite: bool = False):
     """
-    Convert a raster to a Cloud-Optimized GeoTIFF (COG)
+    Convert a raster to a Cloud-Optimized COG GeoTIFF
+    :param input_file:
+    :param output_file:
+    :return:
+    """
+    try:
+        if not output_file.exists() or overwrite:
+
+            cog_options = {
+                # "BLOCKXSIZE": 1024,  # Tile width
+                # "BLOCKYSIZE": 1024,  # Tile height
+                # "TILED": True,  # Enable tiling
+                "COMPRESS": "LZW",  # Compression type (LZW is common for COGs)
+                # "COPY_SRC_OVERVIEWS": True,  # Copy overviews if they exist
+                # "BIGTIFF": True  # Use BigTIFF format for large files
+            }
+            logger.info(f"Converting {input_file} to COG")
+            start_ts = time.time()
+            # Open the input file
+            with rasterio.open(input_file) as src:
+                # Copy the input file to a COG with updated options
+                copy(
+                    src,
+                    output_file,
+                    driver="COG",
+                    **cog_options
+                )
+            logger.info(f"COG saved to {output_file} in {time.time() - start_ts:.2f} seconds")
+        else:
+            logger.info(f"COG already exists: {output_file}")
+
+    except rasterio.errors.RasterioIOError as e:
+        logger.error(f"Error converting {input_file} to COG: {e}")
+
+
+def convert_to_tiled_geotiff(input_file: Path, output_file: Path, overwrite: bool = False):
+    """
+    Convert a raster to a simple tiled GeoTIFF (COG)
     :param input_file:
     :param output_file:
     :return:
@@ -221,16 +258,15 @@ def convert_to_cog(input_file: Path, output_file: Path, overwrite: bool = False)
                 copy(
                     src,
                     output_file,
-                    driver="COG",
+                    driver="GEOTIFF",  # Use GeoTIFF driver for tiled output
                     **cog_options
                 )
-            logger.info(f"COG saved to {output_file} in {time.time() - start_ts:.2f} seconds")
+            logger.info(f"Tiled GEOTIFF saved to {output_file} in {time.time() - start_ts:.2f} seconds")
         else:
-            logger.info(f"COG already exists: {output_file}")
+            logger.info(f"Tiled GEOTIFF already exists: {output_file}")
 
     except rasterio.errors.RasterioIOError as e:
-        logger.error(f"Error converting {input_file} to COG: {e}")
-
+        logger.error(f"Error converting {input_file} to Tiled GEOTIFF: {e}")
 
 
 def batch_convert_to_cog(input_files: typing.List[Path],

@@ -17,40 +17,39 @@ if __name__ == "__main__":
         save_polygon_as_geojson, project_orthomsaic
     from image_template_search.util.util import get_exif_metadata
 
-    # temporary files base path
+    # temporary files base path for output files
     local_base_path = Path("/Users/christian/Downloads")
 
     # location of the input files
     base_path = Path(
-        "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/")
-    base_path = Path(
-        "/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01-02-03/")
-
+        "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/San_STJB01_10012023/")
     # drone image for the reference location
     drone_image_path = base_path / "template_images/San_STJB01_10012023_DJI_0068/San_STJB01_10012023_DJI_0068.JPG"
-    drone_image_path = base_path / "template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
-
-
-    # Orthomosaic
-    # orthomosaic_path = base_path / "San_STJB01_10012023_orthomosaic_Agisoft.tif"  # Metashape
-    orthomosaic_path = base_path / "Metashape_FCD01-02-03-orthomosaic.tif"  # Pix4D
+    orthomosaic_path = base_path / "San_STJB01_10012023_orthomosaic_Agisoft.tif"  # Metashape
     # orthomosaic_path = base_path / "Snt_STJB01to05_10012023_DDeploy.tif"  # DroneDeploy
+
+
+    base_path = Path(
+        "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/Fer_FCD01-02-03_20122021")
+    drone_image_path = base_path / "template_images/Fer_FCD01-02-03_20122021_single_images/DJI_0366.JPG"
+    orthomosaic_path = base_path / "Metashape_FCD01-02-03-orthomosaic.tif"  # Metashape
+
 
 
 
     buffer_distance = 100  # buffer distance in meters
 
-
-
-    orthomosaic_proj_path = local_base_path  / f"{orthomosaic_path.stem}_proj.tif"  # DroneDeploy
+    orthomosaic_proj_path = local_base_path  / f"{orthomosaic_path.stem}_proj.tif"
 
     # clipped orthomosaic
-    orthomosaic_crop_path = local_base_path / f"{orthomosaic_path.stem}_cropped.tif"  # metashape
+    orthomosaic_crop_path = local_base_path / f"{orthomosaic_path.stem}_cropped.tif"
 
     # project_orthomsaic(orthomosaic_path, orthomosaic_proj_path, target_crs="EPSG:4326")
 
     image_meta_data = get_exif_metadata(drone_image_path)
     location_long_lat = shapely.Point(image_meta_data.longitude, image_meta_data.latitude)
+
+    logger.info(f"Drone image location (lon, lat): {location_long_lat}")
 
     with rasterio.open(str(orthomosaic_path)) as src:
         crs = src.crs
@@ -74,7 +73,8 @@ if __name__ == "__main__":
 
     save_polygon_as_geojson(buffer, local_base_path / f"{drone_image_path.stem}_{buffer_distance}_buffer.geojson", EPSG_code=epsg)
 
-    clip_orthomoasic_by_location(bounding_box=buffer, orthomosaic_path=orthomosaic_path,
+    clip_orthomoasic_by_location(bounding_box=buffer,
+                                 orthomosaic_path=orthomosaic_path,
                                  cropped_orthomosaic_path=orthomosaic_crop_path)
 
     logger.info(f"Clipped orthomosaic saved to {orthomosaic_crop_path}")

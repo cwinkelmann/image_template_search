@@ -1,6 +1,8 @@
 """
-mosaics from DroneDeploy are in jpg format. We need to convert them to COG format.
+mosaics from DroneDeploy are compress which makes it hard to work with them. We need to convert them to COG format to speed up interaction with them in GIS software and to make them more accessible for web applications.
 """
+
+
 from pathlib import Path
 
 from image_template_search.geospatial_transformations import convert_to_cog, batch_convert_to_cog
@@ -26,7 +28,7 @@ input_files = [f for f in input_files if Path(f).stem not in [Path(f).stem for f
 #     output_file = output_dir / f"{Path(input_file).stem}.tif"
 #     convert_to_cog(input_file, output_file)
 
-batch_convert_to_cog(input_files, output_dir, max_workers=4)
+batch_convert_to_cog(input_files, output_dir=output_dir, max_workers=4)
 
 
 ### Batch command

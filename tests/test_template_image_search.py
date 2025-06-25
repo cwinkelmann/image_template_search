@@ -103,7 +103,7 @@ def test_template_images_ipf(test_config, template_path, large_image_path):
                                    dpi=75)
 
             assert isinstance(ipf.warped_image_B, np.ndarray)
-            assert (640, 640, 3) == ipf.warped_image_B.shape, "The crop patch should be 512x512x3"
+            assert (640, 640, 3) == ipf.warped_image_B.shape, "The crop patch should be 640x640x3"
 
 def test_template_images_ipf_2(test_config, template_path, large_image_path):
     """

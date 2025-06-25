@@ -10,6 +10,8 @@ import matplotlib.axis as axis
 import matplotlib.axes as axes
 from shapely.geometry import box, Point
 from PIL import Image as PILImage
+PILImage.Image.MAX_IMAGE_PIXELS = 5223651122
+
 from shapely.geometry import Polygon
 from typing import List
 
@@ -25,6 +27,19 @@ from conf.config_dataclass import CacheConfig, get_config
 from image_template_search.util.HastyAnnotationV2 import ImageLabel
 from image_template_search.util.georeferenced_image import ExifMetaData, XMPMetaData, ExtendImageMetaData
 
+from contextlib import contextmanager
+
+@contextmanager
+def large_image_context():
+    """Context manager to temporarily allow large images"""
+    original_limit = PILImage.MAX_IMAGE_PIXELS
+    logger.info(f"Reset PILImage.MAX_IMAGE_PIXELS from {original_limit} to None to allow large images")
+    try:
+
+        PILImage.MAX_IMAGE_PIXELS = None  # Remove limit
+        yield
+    finally:
+        PILImage.MAX_IMAGE_PIXELS = original_limit  # Restore original limit
 
 def feature_extractor_cache():
     """
@@ -276,11 +291,11 @@ def visualise_image(image_path: Path = None,
     if ax is None:
         fig, ax = plt.subplots(1, figsize=figsize, dpi=dpi)  # TODO use the shape of imr to get the right ration
     if image_path is not None:
-        PILImage.Image.MAX_IMAGE_PIXELS = 5223651122
 
-        image = PILImage.open(image_path)
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
+        with large_image_context():
+            image = PILImage.open(image_path)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
 
     imr = np.array(image, dtype=np.uint8)
     ax.imshow(imr)

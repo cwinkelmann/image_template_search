@@ -1,9 +1,24 @@
 # image_template_search
-find template images in larger image sets. This allows for the following workflows:
+Find template images in larger image sets. This repo allows for the following workflows:
 
 - find a small template image in a larger image
+- project annotations from a primary image to nearby images
 
+### Helpers exists for 
 
+- convert_images_to_cog.py to convert Orthomosaics to cloud optimized geotiffs
+- clip_orthomosaic_by_drone_image_loc.py to clip a buffer around an image location from an orthomosaic using a reference drone images
+- register_drone_image_to_orthomosaic.py geospatial registration of a drone image to an orthomosaic by a simple affine transformation
+
+![docs/assets/templating_matching_example/DJI_0066.JPG](docs/assets/templating_matching_example/DJI_0066.JPG)
+
+![docs/assets/templating_matching_example/DD_FMO04_Orthomosaic_export_MonFeb12205040089714_template.jpg](docs/assets/templating_matching_example/DD_FMO04_Orthomosaic_export_MonFeb12205040089714_template.jpg)
+
+Projected image 
+![docs/assets/templating_matching_example/DJI_0066_drone_image.jpg](docs/assets/templating_matching_example/DJI_0066_drone_image.jpg)
+
+Full size example of a projected image
+![docs/assets/templating_matching_example/FootprintOnFullMap.png](docs/assets/templating_matching_example/FootprintOnFullMap.png)
 
 ## Installation
 ```bash

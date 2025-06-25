@@ -418,6 +418,7 @@ class ImagePatchFinderLG(object):
         self.theta = - math.atan2(M[0, 1], M[0, 0]) * 180 / math.pi
         logger.info(f"The camera rotated: {round(self.theta, 2)} by degrees")
 
+        return self.proj_template_polygon
 
     def project_image(self, output_path) -> Path:
         """

@@ -10,9 +10,9 @@ opencv-python==4.10.0.84
 # kornia-rs==0.1.5
 
 # FiftyOne ecosystem
-# fiftyone==1.0.1
-# fiftyone-brain==0.17.0
-# fiftyone-db==1.1.7
+fiftyone==1.0.1
+fiftyone-brain==0.17.0
+fiftyone-db==1.1.7
 
 # LightGlue (computer vision matching)
 git+https://github.com/cvg/LightGlue.git
