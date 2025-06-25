@@ -1,10 +1,14 @@
 name: Build and Cache Docker Container
 
+#on:
+#  push:
+#    branches: [ main, develop ]
+#  pull_request:
+#    branches: [ main ]
+# TODO this is for testing
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
 
 env:
   REGISTRY: ghcr.io
