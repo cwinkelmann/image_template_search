@@ -1,24 +1,39 @@
 """
 Step 2: Batched Template Matching
 """
+
 import os
 import typing
-from dataclasses import asdict
-from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
 
 from examples.review_annotations import debug_hasty_fiftyone
-from image_template_search.types.workflow_config import WorkflowConfiguration, persist_file, load_yaml_config, \
-    BatchWorkflowConfiguration, BatchWorkflowReportConfiguration, data_to_cls
-from image_template_search.util.HastyAnnotationV2 import hA_from_file, HastyAnnotationV2, AnnotatedImage
-from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
+from image_template_search.types.workflow_config import (
+    WorkflowConfiguration,
+    persist_file,
+    load_yaml_config,
+    BatchWorkflowConfiguration,
+    BatchWorkflowReportConfiguration,
+    data_to_cls,
+)
+from image_template_search.util.HastyAnnotationV2 import (
+    hA_from_file,
+    HastyAnnotationV2,
+    AnnotatedImage,
+)
+from image_template_search.workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
 
 
-def init_image_set(bwc: BatchWorkflowConfiguration) -> tuple[typing.List[AnnotatedImage], typing.List[Path], HastyAnnotationV2]:
-    assert isinstance(bwc, BatchWorkflowConfiguration), "bwc should be of type BatchWorkflowConfiguration"
-    assert len(bwc.workflow_configurations) > 0, "There should be at least one workflow configuration"
+def init_image_set(
+    bwc: BatchWorkflowConfiguration,
+) -> tuple[typing.List[AnnotatedImage], typing.List[Path], HastyAnnotationV2]:
+    assert isinstance(
+        bwc, BatchWorkflowConfiguration
+    ), "bwc should be of type BatchWorkflowConfiguration"
+    assert (
+        len(bwc.workflow_configurations) > 0
+    ), "There should be at least one workflow configuration"
 
     hA_projection_images: typing.List[AnnotatedImage] = []
     projection_images_paths: typing.List[Path] = []
@@ -28,7 +43,11 @@ def init_image_set(bwc: BatchWorkflowConfiguration) -> tuple[typing.List[Annotat
 
         # if the drone image is not part of the annotations, we need to add it for visualisation purposes later
         hA_drone_image = hA_from_file(file_path=c.annotations_file_path)
-        hA_drone_images = [i for i in hA_drone_image.images if i.image_name in [Path(c.drone_image_path).name]]
+        hA_drone_images = [
+            i
+            for i in hA_drone_image.images
+            if i.image_name in [Path(c.drone_image_path).name]
+        ]
         drone_image_path = Path(c.drone_image_path)
         if not drone_image_path in projection_images_paths:
             hA_projection_images.extend(hA_drone_images)
@@ -39,32 +58,44 @@ def init_image_set(bwc: BatchWorkflowConfiguration) -> tuple[typing.List[Annotat
 
     return hA_projection_images, projection_images_paths, hA_template
 
+
 if __name__ == "__main__":
     # assert FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables are set
-    if os.getenv("FIFTYONE_CVAT_PASSWORD") is None or os.getenv("FIFTYONE_CVAT_USERNAME") is None:
-        raise ValueError("FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set")
+    if (
+        os.getenv("FIFTYONE_CVAT_PASSWORD") is None
+        or os.getenv("FIFTYONE_CVAT_USERNAME") is None
+    ):
+        raise ValueError(
+            "FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set"
+        )
     organization = "IguanasFromAbove"
     project_name = "Orthomosaic_quality_control"
 
-
     # CVAT correction, see https://docs.voxel51.com/integrations/cvat.html for documentation
-
 
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/batched_workflow_config_Snt_STJB06_12012023.yaml")
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_San_STJB01_10012023.yaml")
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FCD01_02_03.yaml")
-    bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04.yaml")
-    bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04_short.yaml")
-
+    bwc_file_path = Path(
+        "/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04.yaml"
+    )
+    bwc_file_path = Path(
+        "/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04_short.yaml"
+    )
 
     bwc = load_yaml_config(yaml_file_path=bwc_file_path, cls=BatchWorkflowConfiguration)
     hA_projection_images, projection_images, hA_template = init_image_set(bwc)
 
-
-    bwrc = load_yaml_config(yaml_file_path=bwc_file_path, cls=BatchWorkflowReportConfiguration)
+    bwrc = load_yaml_config(
+        yaml_file_path=bwc_file_path, cls=BatchWorkflowReportConfiguration
+    )
 
     for c in bwc.workflow_configurations:
-        hA_projection, images_set, report = workflow_project_single_image_drone_and_annotations(data_to_cls(c, WorkflowConfiguration))
+        hA_projection, images_set, report = (
+            workflow_project_single_image_drone_and_annotations(
+                data_to_cls(c, WorkflowConfiguration)
+            )
+        )
 
         hA_projection_images.extend(hA_projection.images)
         projection_images.extend(images_set)
@@ -78,7 +109,9 @@ if __name__ == "__main__":
     bwrc.anno_key = bwc.dataset_name
     bwrc.dataset_name = bwc.dataset_name
 
-    batch_workflow_report_config_file_path = bwc.base_path / f"batch_workflow_report_config_{bwc.dataset_name}.yaml"
+    batch_workflow_report_config_file_path = (
+        bwc.base_path / f"batch_workflow_report_config_{bwc.dataset_name}.yaml"
+    )
     persist_file(config=bwrc, file_path=batch_workflow_report_config_file_path)
 
     try:
@@ -97,11 +130,15 @@ if __name__ == "__main__":
             attributes=["iscrowd"],
             launch_editor=True,
             organization=organization,
-            project_name=project_name
+            project_name=project_name,
         )
         print(dataset.get_annotation_info(bwc.dataset_name))
     except ValueError as e:
         logger.error(e)
-        logger.error(f"Could not create annotation dataset {bwc.dataset_name} probably because the name is already taken, delete it first. If you want to delete it, use the FiftyOne CLI: \n >>  'fiftyone delete {bwc.dataset_name}'")
+        logger.error(
+            f"Could not create annotation dataset {bwc.dataset_name} probably because the name is already taken, delete it first. If you want to delete it, use the FiftyOne CLI: \n >>  'fiftyone delete {bwc.dataset_name}'"
+        )
 
-    logger.info(f"Wrote batch workflow report config to {batch_workflow_report_config_file_path.resolve()}. Use that file for the next step in the workflow after you corrected the annotations in CVAT.")
+    logger.info(
+        f"Wrote batch workflow report config to {batch_workflow_report_config_file_path.resolve()}. Use that file for the next step in the workflow after you corrected the annotations in CVAT."
+    )

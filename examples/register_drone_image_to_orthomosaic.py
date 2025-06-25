@@ -4,13 +4,15 @@ Short Snippet: Register a simple image to an orthomosaic using a homography matr
 This is a bit different to getting the homography between two non-geospatial images
 
 """
-import cv2
-import rasterio
+
 import tempfile
-from loguru import logger
 from pathlib import Path
-from rasterio.crs import CRS
+
+import cv2
 import numpy as np
+import rasterio
+from loguru import logger
+from rasterio.crs import CRS
 
 from image_template_search.image_patch_finder import ImagePatchFinderLG
 from image_template_search.util.util import visualise_image, visualise_polygons
@@ -47,7 +49,7 @@ def georeference_image(image_path, orthomosaic_path, M, output_path=None):
         (ortho_width, ortho_height),
         flags=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0, 0, 0)
+        borderValue=(0, 0, 0),
     )
 
     # Convert BGR to RGB for rasterio
@@ -55,11 +57,11 @@ def georeference_image(image_path, orthomosaic_path, M, output_path=None):
 
     # Create alpha channel - transparent where all RGB channels are 0 (black)
     alpha_channel = np.where(
-        (warped_image_rgb[:, :, 0] == 0) &
-        (warped_image_rgb[:, :, 1] == 0) &
-        (warped_image_rgb[:, :, 2] == 0),
+        (warped_image_rgb[:, :, 0] == 0)
+        & (warped_image_rgb[:, :, 1] == 0)
+        & (warped_image_rgb[:, :, 2] == 0),
         0,  # Transparent (0) where black
-        255  # Opaque (255) elsewhere
+        255,  # Opaque (255) elsewhere
     ).astype(np.uint8)
 
     # Combine RGB with alpha to create RGBA
@@ -79,20 +81,20 @@ def georeference_image(image_path, orthomosaic_path, M, output_path=None):
 
     # Write the georeferenced image
     with rasterio.open(
-            output_path,
-            'w',
-            driver='GTiff',
-            height=ortho_height,
-            width=ortho_width,
-            count=4,  # RGBA channels
-            dtype=warped_image_rgba.dtype,
-            crs=ortho_crs,
-            transform=ortho_transform,
-            compress='lzw',  # Optional compression
-            tiled=True,  # Optional tiling for better performance
-            blockxsize=512,
-            blockysize=512,
-            nodata=0  # Set nodata value for transparency
+        output_path,
+        "w",
+        driver="GTiff",
+        height=ortho_height,
+        width=ortho_width,
+        count=4,  # RGBA channels
+        dtype=warped_image_rgba.dtype,
+        crs=ortho_crs,
+        transform=ortho_transform,
+        compress="lzw",  # Optional compression
+        tiled=True,  # Optional tiling for better performance
+        blockxsize=512,
+        blockysize=512,
+        nodata=0,  # Set nodata value for transparency
     ) as dst:
         # Write each channel (RGB + Alpha)
         for i in range(4):
@@ -103,41 +105,61 @@ def georeference_image(image_path, orthomosaic_path, M, output_path=None):
             rasterio.enums.ColorInterp.red,
             rasterio.enums.ColorInterp.green,
             rasterio.enums.ColorInterp.blue,
-            rasterio.enums.ColorInterp.alpha
+            rasterio.enums.ColorInterp.alpha,
         ]
 
         # Add metadata
         dst.update_tags(
             source_image=str(image_path),
             orthomosaic_reference=str(orthomosaic_path),
-            transformation_applied="homography_registration"
+            transformation_applied="homography_registration",
         )
 
     logger.info(f"Georeferenced image saved to: {output_path}")
     return str(output_path)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     drone_image_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0918_06122021_Nazca.JPG")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0918_06122021_Nazca.JPG"
+    )
     drone_image_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021/Flo_FLPC07_DJI_0051_22012021.JPG")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021/Flo_FLPC07_DJI_0051_22012021.JPG"
+    )
     # orthomosaic_crop_path = Path("/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0919_06122021_Nazca.JPG")
     orthomosaic_crop_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Mar_MBN01_06122021.tif")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Mar_MBN01_06122021.tif"
+    )
     orthomosaic_crop_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Flo_FLPC07_22012021.tif")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Flo_FLPC07_22012021.tif"
+    )
     # orthomosaic_crop_path = Path(
     #     "'/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Agisoft orthomosaics/Flo/Flo_FLPC07_22012021.tif'")
 
     output_path = Path(drone_image_path.name).with_suffix(".tif")
 
-    ipf = ImagePatchFinderLG(template_path=drone_image_path,
-                             large_image_path=orthomosaic_crop_path)
+    ipf = ImagePatchFinderLG(
+        template_path=drone_image_path, large_image_path=orthomosaic_crop_path
+    )
 
     ipf.find_patch()
-    ax_i = visualise_image(image_path=ipf.large_image_path, show=False, dpi=150, title="Projected Orthomosaic")
-    visualise_polygons(polygons=[ipf.proj_template_polygon], ax=ax_i, show=True, color="red", linewidth=4)
+    ax_i = visualise_image(
+        image_path=ipf.large_image_path,
+        show=False,
+        dpi=150,
+        title="Projected Orthomosaic",
+    )
+    visualise_polygons(
+        polygons=[ipf.proj_template_polygon],
+        ax=ax_i,
+        show=True,
+        color="red",
+        linewidth=4,
+    )
 
-    georeference_image(image_path=drone_image_path, orthomosaic_path=orthomosaic_crop_path, M=ipf.M, output_path=output_path)
+    georeference_image(
+        image_path=drone_image_path,
+        orthomosaic_path=orthomosaic_crop_path,
+        M=ipf.M,
+        output_path=output_path,
+    )

@@ -2,8 +2,6 @@
 Workflow to find a template image in a large orthomosaic
 
 ## add FIFTYONE_CVAT_USERNAME and FIFTYONE_CVAT_PASSWORD to your environment variables
-os.environ["FIFTYONE_CVAT_USERNAME"] = "karisu"
-os.environ["FIFTYONE_CVAT_PASSWORD"] = "Q6YRN7Z8Z4f5X4S"
 """
 
 from PIL import Image

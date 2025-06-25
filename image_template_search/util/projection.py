@@ -65,7 +65,6 @@ def project_bounding_box(label: typing.Union[Polygon, ImageLabel], M: np.ndarray
     else:
         bbox_a = label
 
-    # TODO use the corners directly if the object is rectangular
     minx, miny, maxx, maxy = bbox_a.bounds
 
     # Define the four corners of the bounding box in Image A
@@ -95,7 +94,7 @@ def project_bounding_box(label: typing.Union[Polygon, ImageLabel], M: np.ndarray
 def project_annotations_to_crop(buffer: shapely.Polygon,
                                 imagelabels: list[ImageLabel]):
     """
-    TODO this is pretty much the code in 'project_bounding_box' but with a different signature
+    this is pretty much the code in 'project_bounding_box' but with a different signature
     :param pc:
     :param patch_size:
     :param image:

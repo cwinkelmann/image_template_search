@@ -1,7 +1,8 @@
 import click
 from pathlib import Path
 from image_template_search.types.workflow_config import WorkflowConfiguration, load_yaml_config
-from workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
+from image_template_search.workflow_iguana_deduplication import workflow_project_single_image_drone_and_annotations
+
 
 @click.command()
 @click.argument('file_path', type=click.Path(exists=True, dir_okay=False, path_type=Path))

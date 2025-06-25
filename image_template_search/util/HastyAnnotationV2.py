@@ -244,7 +244,6 @@ class TagGroup(BaseModel):
     tags: List[str]
 
 
-# TODO check if this format is correct
 class Attribute(BaseModel):
     name: str
     type: str
@@ -363,16 +362,7 @@ def filter_by_image_tags(hA: HastyAnnotationV2, image_tags: Optional[List[str]] 
         return hA
 
 
-def convert_masks_to_bbox(hA: HastyAnnotationV2) -> HastyAnnotationV2:
-    """
-    convert every mask to a bounding box
-    :param hA:
-    :return:
-    """
 
-    # TODO it seems this already implemented in the HastyAnnotationV2 object
-
-    return hA
 
 
 def remove_images_with_no_labels(project: HastyAnnotationV2) -> HastyAnnotationV2:

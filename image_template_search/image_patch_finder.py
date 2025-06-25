@@ -111,10 +111,9 @@ def find_patch_tiled(template_path: Path,
                      tile_size_y=1200,
                      tile_base_path=Path("./"),
                      cache_path=Path("./cache"),
-                     MIN_MATCH_COUNT=50, visualise=False) -> typing.Tuple[np.ndarray, np.array]:
+                     MIN_MATCH_COUNT=50,
+                     visualise=False) -> typing.Tuple[np.ndarray, np.array]:
     """
-    TODO refactor the parameters
-    TODO tile from the center as well
     Find the template in the large image by tiling the large image, then iterating through the tiles
 
     :param tile_size_y:

@@ -9,6 +9,9 @@ This entails matching the image to a potentially quite big geotiff/jpf
 import PIL
 
 from PIL import Image
+
+from examples.playground.detection_deduplication import find_objects_individual_all, find_objects
+
 Image.MAX_IMAGE_PIXELS = 5223651122
 
 import copy
@@ -22,7 +25,6 @@ from shapely.geometry.polygon import Polygon
 
 
 from conf.config_dataclass import CacheConfig
-from detection_deduplication import find_objects, find_objects_individual_all
 from image_template_search.util.projection import project_bounding_box
 from image_template_search.image_patch_finder import ImagePatchFinderLG
 from image_template_search.util.CoveredObjectType import CoveredObject
@@ -344,7 +346,6 @@ def forward_template_matching_projection(
             visualise_image(image_path=template_image_path, title="template image")
 
             ipf_t = ImagePatchFinderLG(template_path=template_image_path,
-                                       template_polygon=template_extent,
                                        large_image_path=cropped_destination_image_path)
 
             template_match = ipf_t.find_patch(similarity_threshold=0.000005) # FIXME this is where an error can come from. If both images

@@ -9,25 +9,34 @@ This is a bit different to getting the homography between two non-geospatial ima
 
 """
 
-import cv2
 import gc
+import tempfile
+from pathlib import Path
+
+import cv2
 import numpy as np
 import rasterio
 import shapely
-import tempfile
 from loguru import logger
-from pathlib import Path
-
 from pyproj import CRS
 
 from image_template_search.clip_by_location import clip_orthomoasic_by_location
-from image_template_search.geospatial_transformations import convert_to_cog, create_buffer_box, convert_point_crs, \
-    project_orthomsaic
+from image_template_search.geospatial_transformations import (
+    convert_to_cog,
+    create_buffer_box,
+    convert_point_crs,
+    project_orthomsaic,
+)
 from image_template_search.image_patch_finder import ImagePatchFinderLG
-from image_template_search.util.util import get_exif_metadata, list_images, visualise_image, visualise_polygons
+from image_template_search.util.util import (
+    get_exif_metadata,
+    list_images,
+)
 
 
-def calculate_optimal_output_resolution(image_shape, M, ortho_transform, min_resolution_factor=1.0):
+def calculate_optimal_output_resolution(
+    image_shape, M, ortho_transform, min_resolution_factor=1.0
+):
     """
     Calculate optimal output resolution to preserve image quality.
 
@@ -40,10 +49,10 @@ def calculate_optimal_output_resolution(image_shape, M, ortho_transform, min_res
     img_height, img_width = image_shape[:2]
 
     # Get corners of source image
-    corners = np.array([
-        [0, 0], [img_width, 0],
-        [img_width, img_height], [0, img_height]
-    ], dtype=np.float32).reshape(-1, 1, 2)
+    corners = np.array(
+        [[0, 0], [img_width, 0], [img_width, img_height], [0, img_height]],
+        dtype=np.float32,
+    ).reshape(-1, 1, 2)
 
     # Transform corners to orthomosaic space
     transformed_corners = cv2.perspectiveTransform(corners, M)
@@ -79,29 +88,33 @@ def calculate_optimal_output_resolution(image_shape, M, ortho_transform, min_res
         (min_y + dst_height) * ortho_transform.e + ortho_transform.f,  # south
         (min_x + dst_width) * ortho_transform.a + ortho_transform.c,  # east
         min_y * ortho_transform.e + ortho_transform.f,  # north
-        output_width, output_height
+        output_width,
+        output_height,
     )
 
     # Adjust homography matrix for the new output dimensions
     scale_x = output_width / dst_width
     scale_y = output_height / dst_height
 
-    scale_matrix = np.array([
-        [scale_x, 0, -min_x * scale_x],
-        [0, scale_y, -min_y * scale_y],
-        [0, 0, 1]
-    ], dtype=np.float64)
+    scale_matrix = np.array(
+        [[scale_x, 0, -min_x * scale_x], [0, scale_y, -min_y * scale_y], [0, 0, 1]],
+        dtype=np.float64,
+    )
 
     adjusted_M = scale_matrix @ M
 
     return output_width, output_height, adjusted_transform, adjusted_M
 
 
-def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
-                                           interpolation='cubic',
-                                           anti_aliasing=True,
-                                           resolution_factor=2.0,
-                                           output_path=None):
+def georeference_image_adaptive_resolution(
+    image_path,
+    orthomosaic_path,
+    M,
+    interpolation="cubic",
+    anti_aliasing=True,
+    resolution_factor=2.0,
+    output_path=None,
+):
     """
     Georeference with adaptive resolution to preserve image quality.
 
@@ -130,20 +143,24 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
         ortho_crs = ortho_src.crs
 
     # Calculate optimal output resolution
-    output_width, output_height, adjusted_transform, adjusted_M = calculate_optimal_output_resolution(
-        image.shape, M, ortho_transform, min_resolution_factor=resolution_factor
+    output_width, output_height, adjusted_transform, adjusted_M = (
+        calculate_optimal_output_resolution(
+            image.shape, M, ortho_transform, min_resolution_factor=resolution_factor
+        )
     )
 
     logger.info(f"Source image: {image.shape[1]}×{image.shape[0]}")
     logger.info(f"Output image: {output_width}×{output_height}")
-    logger.info(f"Resolution preserved: {(output_width * output_height) / (image.shape[1] * image.shape[0]):.2f}x")
+    logger.info(
+        f"Resolution preserved: {(output_width * output_height) / (image.shape[1] * image.shape[0]):.2f}x"
+    )
 
     # Set up interpolation
     interp_methods = {
-        'linear': cv2.INTER_LINEAR,
-        'cubic': cv2.INTER_CUBIC,
-        'lanczos4': cv2.INTER_LANCZOS4,
-        'nearest': cv2.INTER_NEAREST
+        "linear": cv2.INTER_LINEAR,
+        "cubic": cv2.INTER_CUBIC,
+        "lanczos4": cv2.INTER_LANCZOS4,
+        "nearest": cv2.INTER_NEAREST,
     }
     interp_flag = interp_methods.get(interpolation.lower(), cv2.INTER_CUBIC)
 
@@ -154,7 +171,7 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
         (output_width, output_height),
         flags=interp_flag,
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0, 0, 0)
+        borderValue=(0, 0, 0),
     )
 
     # Convert BGR to RGB
@@ -162,10 +179,11 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
 
     # Create alpha channel
     alpha_channel = np.where(
-        (warped_image_rgb[:, :, 0] == 0) &
-        (warped_image_rgb[:, :, 1] == 0) &
-        (warped_image_rgb[:, :, 2] == 0),
-        0, 255
+        (warped_image_rgb[:, :, 0] == 0)
+        & (warped_image_rgb[:, :, 1] == 0)
+        & (warped_image_rgb[:, :, 2] == 0),
+        0,
+        255,
     ).astype(np.uint8)
 
     warped_image_rgba = np.dstack([warped_image_rgb, alpha_channel])
@@ -177,26 +195,28 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
     else:
         output_path = Path(output_path)
         if output_path.is_dir():
-            output_path = output_path / f"georeferenced_hires_{Path(image_path).stem}.tif"
+            output_path = (
+                output_path / f"georeferenced_hires_{Path(image_path).stem}.tif"
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write with adaptive resolution and transform
     with rasterio.open(
-            output_path,
-            'w',
-            driver='GTiff',
-            height=output_height,
-            width=output_width,
-            count=4,
-            dtype=warped_image_rgba.dtype,
-            crs=ortho_crs,
-            transform=adjusted_transform,  # Use adjusted transform
-            compress='lzw',
-            tiled=True,
-            blockxsize=512,
-            blockysize=512,
-            nodata=0
+        output_path,
+        "w",
+        driver="GTiff",
+        height=output_height,
+        width=output_width,
+        count=4,
+        dtype=warped_image_rgba.dtype,
+        crs=ortho_crs,
+        transform=adjusted_transform,  # Use adjusted transform
+        compress="lzw",
+        tiled=True,
+        blockxsize=512,
+        blockysize=512,
+        nodata=0,
     ) as dst:
         for i in range(4):
             dst.write(warped_image_rgba[:, :, i], i + 1)
@@ -205,14 +225,14 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
             rasterio.enums.ColorInterp.red,
             rasterio.enums.ColorInterp.green,
             rasterio.enums.ColorInterp.blue,
-            rasterio.enums.ColorInterp.alpha
+            rasterio.enums.ColorInterp.alpha,
         ]
 
         dst.update_tags(
             source_image=str(image_path),
             orthomosaic_reference=str(orthomosaic_path),
             transformation_applied="homography_registration_adaptive_resolution",
-            resolution_factor=str(resolution_factor)
+            resolution_factor=str(resolution_factor),
         )
 
     logger.info(f"High-resolution georeferenced image saved to: {output_path}")
@@ -223,12 +243,15 @@ def georeference_image_adaptive_resolution(image_path, orthomosaic_path, M,
 def georeference_image_max_quality(image_path, orthomosaic_path, M, output_path=None):
     """Maximum quality georeferencing - preserves as much resolution as possible."""
     return georeference_image_adaptive_resolution(
-        image_path, orthomosaic_path, M,
-        interpolation='cubic',
+        image_path,
+        orthomosaic_path,
+        M,
+        interpolation="cubic",
         anti_aliasing=True,
         resolution_factor=1.0,  # 3x orthomosaic resolution
-        output_path=output_path
+        output_path=output_path,
     )
+
 
 ###
 def georeference_image_high_quality(image_path, orthomosaic_path, M, output_path=None):
@@ -248,15 +271,19 @@ def georeference_image_high_quality(image_path, orthomosaic_path, M, output_path
         output_path=output_path,
         interpolation="cubic",  # Best quality interpolation
         anti_aliasing=False,  # Enable anti-aliasing
-        supersampling_factor=1  # 2x supersampling for maximum quality
+        supersampling_factor=1,  # 2x supersampling for maximum quality
     )
 
 
-def georeference_image(image_path, orthomosaic_path, M,
-                       interpolation,
-                       supersampling_factor,
-                       anti_aliasing,
-                       output_path=None):
+def georeference_image(
+    image_path,
+    orthomosaic_path,
+    M,
+    interpolation,
+    supersampling_factor,
+    anti_aliasing,
+    output_path=None,
+):
     """
     Register an image to an orthomosaic using the provided transformation matrix M.
 
@@ -285,21 +312,20 @@ def georeference_image(image_path, orthomosaic_path, M,
     output_height = ortho_height * supersampling_factor
     # Adjust homography matrix for supersampling
     if supersampling_factor > 1:
-        scale_matrix = np.array([
-            [supersampling_factor, 0, 0],
-            [0, supersampling_factor, 0],
-            [0, 0, 1]
-        ], dtype=np.float64)
+        scale_matrix = np.array(
+            [[supersampling_factor, 0, 0], [0, supersampling_factor, 0], [0, 0, 1]],
+            dtype=np.float64,
+        )
         M_scaled = scale_matrix @ M
     else:
         M_scaled = M
 
     # Add this mapping at the beginning of the function
     interp_methods = {
-        'linear': cv2.INTER_LINEAR,
-        'cubic': cv2.INTER_CUBIC,
-        'lanczos4': cv2.INTER_LANCZOS4,
-        'nearest': cv2.INTER_NEAREST
+        "linear": cv2.INTER_LINEAR,
+        "cubic": cv2.INTER_CUBIC,
+        "lanczos4": cv2.INTER_LANCZOS4,
+        "nearest": cv2.INTER_NEAREST,
     }
 
     interp_flag = interp_methods.get(interpolation.lower(), cv2.INTER_CUBIC)
@@ -311,30 +337,32 @@ def georeference_image(image_path, orthomosaic_path, M,
         (output_width, output_height),
         flags=interp_flag,  # Changed this line
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0, 0, 0)
+        borderValue=(0, 0, 0),
     )
 
     # Replace the downsampling section
     if supersampling_factor > 1:
         if anti_aliasing:
             kernel_size = supersampling_factor * 2 + 1
-            warped_image = cv2.GaussianBlur(warped_image, (kernel_size, kernel_size),
-                                            supersampling_factor * 0.5)
+            warped_image = cv2.GaussianBlur(
+                warped_image, (kernel_size, kernel_size), supersampling_factor * 0.5
+            )
 
         # Use higher quality downsampling
-        warped_image = cv2.resize(warped_image, (ortho_width, ortho_height),
-                                  interpolation=cv2.INTER_CUBIC)  # Changed from INTER_AREA
+        warped_image = cv2.resize(
+            warped_image, (ortho_width, ortho_height), interpolation=cv2.INTER_CUBIC
+        )  # Changed from INTER_AREA
 
     # Convert BGR to RGB for rasterio
     warped_image_rgb = cv2.cvtColor(warped_image, cv2.COLOR_BGR2RGB)
 
     # Create alpha channel - transparent where all RGB channels are 0 (black)
     alpha_channel = np.where(
-        (warped_image_rgb[:, :, 0] == 0) &
-        (warped_image_rgb[:, :, 1] == 0) &
-        (warped_image_rgb[:, :, 2] == 0),
+        (warped_image_rgb[:, :, 0] == 0)
+        & (warped_image_rgb[:, :, 1] == 0)
+        & (warped_image_rgb[:, :, 2] == 0),
         0,  # Transparent (0) where black
-        255  # Opaque (255) elsewhere
+        255,  # Opaque (255) elsewhere
     ).astype(np.uint8)
 
     # Combine RGB with alpha to create RGBA
@@ -354,20 +382,20 @@ def georeference_image(image_path, orthomosaic_path, M,
 
     # Write the georeferenced image
     with rasterio.open(
-            output_path,
-            'w',
-            driver='GTiff',
-            height=ortho_height,
-            width=ortho_width,
-            count=4,  # RGBA channels
-            dtype=warped_image_rgba.dtype,
-            crs=ortho_crs,
-            transform=ortho_transform,
-            compress='lzw',  # Optional compression
-            tiled=True,  # Optional tiling for better performance
-            blockxsize=512,
-            blockysize=512,
-            nodata=0  # Set nodata value for transparency
+        output_path,
+        "w",
+        driver="GTiff",
+        height=ortho_height,
+        width=ortho_width,
+        count=4,  # RGBA channels
+        dtype=warped_image_rgba.dtype,
+        crs=ortho_crs,
+        transform=ortho_transform,
+        compress="lzw",  # Optional compression
+        tiled=True,  # Optional tiling for better performance
+        blockxsize=512,
+        blockysize=512,
+        nodata=0,  # Set nodata value for transparency
     ) as dst:
         # Write each channel (RGB + Alpha)
         for i in range(4):
@@ -378,14 +406,14 @@ def georeference_image(image_path, orthomosaic_path, M,
             rasterio.enums.ColorInterp.red,
             rasterio.enums.ColorInterp.green,
             rasterio.enums.ColorInterp.blue,
-            rasterio.enums.ColorInterp.alpha
+            rasterio.enums.ColorInterp.alpha,
         ]
 
         # Add metadata
         dst.update_tags(
             source_image=str(image_path),
             orthomosaic_reference=str(orthomosaic_path),
-            transformation_applied="homography_registration"
+            transformation_applied="homography_registration",
         )
 
     logger.info(f"Georeferenced image saved to: {output_path}")
@@ -404,9 +432,9 @@ def debug_homography_transformation(image_path, orthomosaic_path, M):
 
     # Get image corners
     h, w = image.shape[:2]
-    corners = np.array([
-        [0, 0], [w, 0], [w, h], [0, h]
-    ], dtype=np.float32).reshape(-1, 1, 2)
+    corners = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32).reshape(
+        -1, 1, 2
+    )
 
     # Transform corners
     transformed_corners = cv2.perspectiveTransform(corners, M)
@@ -415,12 +443,18 @@ def debug_homography_transformation(image_path, orthomosaic_path, M):
     logger.info(f"Source image size: {w}×{h}")
     logger.info(f"Orthomosaic size: {ortho_width}×{ortho_height}")
     logger.info(f"Transformed corners: {transformed_corners}")
-    logger.info(f"Corner bounds: x=[{transformed_corners[:, 0].min():.1f}, {transformed_corners[:, 0].max():.1f}], "
-                f"y=[{transformed_corners[:, 1].min():.1f}, {transformed_corners[:, 1].max():.1f}]")
+    logger.info(
+        f"Corner bounds: x=[{transformed_corners[:, 0].min():.1f}, {transformed_corners[:, 0].max():.1f}], "
+        f"y=[{transformed_corners[:, 1].min():.1f}, {transformed_corners[:, 1].max():.1f}]"
+    )
 
     # Check if corners are within orthomosaic bounds
-    in_bounds = ((transformed_corners[:, 0] >= 0) & (transformed_corners[:, 0] < ortho_width) &
-                 (transformed_corners[:, 1] >= 0) & (transformed_corners[:, 1] < ortho_height))
+    in_bounds = (
+        (transformed_corners[:, 0] >= 0)
+        & (transformed_corners[:, 0] < ortho_width)
+        & (transformed_corners[:, 1] >= 0)
+        & (transformed_corners[:, 1] < ortho_height)
+    )
     logger.info(f"Corners in bounds: {in_bounds}")
 
     return transformed_corners
@@ -487,10 +521,15 @@ def save_array_as_jpg(image_array, output_path, debug_info=True):
 
     return success
 
-def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
-                                       scale_factor=2.0,
-                                       interpolation='cubic',
-                                       output_path=None) -> Path:
+
+def georeference_image_simple_high_res(
+    image_path,
+    orthomosaic_path,
+    M,
+    scale_factor=2.0,
+    interpolation="cubic",
+    output_path=None,
+) -> Path:
     """
     Simple high-resolution georeferencing that works well with cropped orthomosaics.
 
@@ -520,20 +559,18 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
     output_height = int(ortho_height * scale_factor)
 
     # Scale the homography matrix for higher resolution output
-    scale_matrix = np.array([
-        [scale_factor, 0, 0],
-        [0, scale_factor, 0],
-        [0, 0, 1]
-    ], dtype=np.float64)
+    scale_matrix = np.array(
+        [[scale_factor, 0, 0], [0, scale_factor, 0], [0, 0, 1]], dtype=np.float64
+    )
 
     M_scaled = scale_matrix @ M
 
     # Set up interpolation
     interp_methods = {
-        'linear': cv2.INTER_LINEAR,
-        'cubic': cv2.INTER_CUBIC,
-        'lanczos4': cv2.INTER_LANCZOS4,
-        'nearest': cv2.INTER_NEAREST
+        "linear": cv2.INTER_LINEAR,
+        "cubic": cv2.INTER_CUBIC,
+        "lanczos4": cv2.INTER_LANCZOS4,
+        "nearest": cv2.INTER_NEAREST,
     }
     interp_flag = interp_methods.get(interpolation.lower(), cv2.INTER_CUBIC)
 
@@ -544,7 +581,7 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
         (output_width, output_height),
         flags=interp_flag,
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0, 0, 0)
+        borderValue=(0, 0, 0),
     )
 
     logger.info(f"Source image: {image.shape[1]}×{image.shape[0]}")
@@ -556,10 +593,11 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
 
     # Create alpha channel
     alpha_channel = np.where(
-        (warped_image_rgb[:, :, 0] == 0) &
-        (warped_image_rgb[:, :, 1] == 0) &
-        (warped_image_rgb[:, :, 2] == 0),
-        0, 255
+        (warped_image_rgb[:, :, 0] == 0)
+        & (warped_image_rgb[:, :, 1] == 0)
+        & (warped_image_rgb[:, :, 2] == 0),
+        0,
+        255,
     ).astype(np.uint8)
 
     warped_image_rgba = np.dstack([warped_image_rgb, alpha_channel])
@@ -571,7 +609,7 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
         ortho_transform.c,
         ortho_transform.d,
         ortho_transform.e / scale_factor,  # Smaller pixel size (higher resolution)
-        ortho_transform.f
+        ortho_transform.f,
     )
 
     # Create output path
@@ -581,31 +619,32 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
     else:
         output_path = Path(output_path)
         if output_path.is_dir():
-            output_path = output_path / f"georeferenced_simple_{Path(image_path).stem}.tif"
+            output_path = (
+                output_path / f"georeferenced_simple_{Path(image_path).stem}.tif"
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # save the transformed image as a jpeg for debugging
-    debug_image_path = output_path.with_suffix('.jpg')
+    debug_image_path = output_path.with_suffix(".jpg")
     save_array_as_jpg(warped_image_rgb, debug_image_path)
-
 
     # Write the result
     with rasterio.open(
-            output_path,
-            'w',
-            driver='GTiff',
-            height=output_height,
-            width=output_width,
-            count=4,
-            dtype=warped_image_rgba.dtype,
-            crs=ortho_crs,
-            transform=scaled_transform,
-            compress='lzw',
-            tiled=True,
-            blockxsize=512,
-            blockysize=512,
-            nodata=0
+        output_path,
+        "w",
+        driver="GTiff",
+        height=output_height,
+        width=output_width,
+        count=4,
+        dtype=warped_image_rgba.dtype,
+        crs=ortho_crs,
+        transform=scaled_transform,
+        compress="lzw",
+        tiled=True,
+        blockxsize=512,
+        blockysize=512,
+        nodata=0,
     ) as dst:
         for i in range(4):
             dst.write(warped_image_rgba[:, :, i], i + 1)
@@ -614,21 +653,21 @@ def georeference_image_simple_high_res(image_path, orthomosaic_path, M,
             rasterio.enums.ColorInterp.red,
             rasterio.enums.ColorInterp.green,
             rasterio.enums.ColorInterp.blue,
-            rasterio.enums.ColorInterp.alpha
+            rasterio.enums.ColorInterp.alpha,
         ]
 
         dst.update_tags(
             source_image=str(image_path),
             orthomosaic_reference=str(orthomosaic_path),
             transformation_applied="simple_high_resolution_georeferencing",
-            scale_factor=str(scale_factor)
+            scale_factor=str(scale_factor),
         )
 
     logger.info(f"Georeferenced image saved to: {output_path}")
     return output_path
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # drone_image_path = Path(
     #     "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0918_06122021_Nazca.JPG")
@@ -636,9 +675,11 @@ if __name__ == '__main__':
     #     "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021/Flo_FLPC07_DJI_0051_22012021.JPG")
 
     drone_image_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021"
+    )
     drone_image_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC06_22012021")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC06_22012021"
+    )
     # drone_image_path = Path(
     #     "/Volumes/G-DRIVE/Iguanas_From_Above/2021 Jan/Photos from drone/Floreana/22.01.21/FPC07/")
 
@@ -646,21 +687,27 @@ if __name__ == '__main__':
 
     # orthomosaic_path = Path("/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0919_06122021_Nazca.JPG")
     orthomosaic_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Mar_MBN01_06122021.tif")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Mar_MBN01_06122021.tif"
+    )
     orthomosaic_path = Path(
-        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Flo_FLPC07_22012021.tif")
+        "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Flo_FLPC07_22012021.tif"
+    )
 
-    orthomosaic_path = Path(
-        "/Users/christian/Downloads/Flo_FLPC07_22012021_MS.tif")
-    proj_orthomosaic_path = Path("/Users/christian/Downloads/Flo_FLPC07_22012021_MS_32715.tif")
+    orthomosaic_path = Path("/Users/christian/Downloads/Flo_FLPC07_22012021_MS.tif")
+    proj_orthomosaic_path = Path(
+        "/Users/christian/Downloads/Flo_FLPC07_22012021_MS_32715.tif"
+    )
 
-    orthomosaic_path = Path(
-        "/Users/christian/Downloads/Flo_FLPC06_22012021_MS.tif")
-    proj_orthomosaic_path = Path("/Users/christian/Downloads/Flo_FLPC06_22012021_MS_32715.tif")
+    orthomosaic_path = Path("/Users/christian/Downloads/Flo_FLPC06_22012021_MS.tif")
+    proj_orthomosaic_path = Path(
+        "/Users/christian/Downloads/Flo_FLPC06_22012021_MS_32715.tif"
+    )
     # orthomosaic_crop_path = Path(
     #     "'/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Agisoft orthomosaics/Flo/Flo_FLPC07_22012021.tif'")
 
-    output_base_path = Path("/Volumes/2TB/projected_drone_images_MS") / drone_image_path.name
+    output_base_path = (
+        Path("/Volumes/2TB/projected_drone_images_MS") / drone_image_path.name
+    )
     # output_base_path = Path("/Volumes/u235425.your-storagebox.de/Iguanas_From_Above/temp") / drone_image_path.name
     output_base_path.mkdir(parents=True, exist_ok=True)
 
@@ -669,12 +716,20 @@ if __name__ == '__main__':
         # if drone_image_path.name != "Flo_FLPC07_DJI_0051_22012021.JPG":
         # if drone_image_path.name != "Flo_FLPC07_DJI_0980_22012021.JPG":
         #     continue
-        orthomosaic_crop_path = Path(f"{orthomosaic_path.name}_cropped_{drone_image_path.stem}.tif")
+        orthomosaic_crop_path = Path(
+            f"{orthomosaic_path.name}_cropped_{drone_image_path.stem}.tif"
+        )
 
-        output_path = output_base_path / Path(drone_image_path.name).with_suffix(".tiff")
-        output_cog_path = output_base_path / "cog" /Path(drone_image_path.name).with_suffix(".tiff")
+        output_path = output_base_path / Path(drone_image_path.name).with_suffix(
+            ".tiff"
+        )
+        output_cog_path = (
+            output_base_path / "cog" / Path(drone_image_path.name).with_suffix(".tiff")
+        )
         if output_cog_path.exists():
-            logger.info(f"Output path {output_path} already exists. Skipping processing for {drone_image_path}.")
+            logger.info(
+                f"Output path {output_path} already exists. Skipping processing for {drone_image_path}."
+            )
             continue
 
         image_meta_data = get_exif_metadata(drone_image_path)
@@ -686,7 +741,11 @@ if __name__ == '__main__':
         if proj_orthomosaic_path.exists():
             orthomosaic_path = proj_orthomosaic_path
         else:
-            project_orthomsaic(orthomosaic_path=orthomosaic_path, proj_orthomosaic_path=proj_orthomosaic_path, target_crs=EPSG_STRING)
+            project_orthomsaic(
+                orthomosaic_path=orthomosaic_path,
+                proj_orthomosaic_path=proj_orthomosaic_path,
+                target_crs=EPSG_STRING,
+            )
             orthomosaic_path = proj_orthomosaic_path
 
         projected_point = convert_point_crs(
@@ -694,9 +753,7 @@ if __name__ == '__main__':
             target_crs=target_crs.__str__(),
             source_crs="EPSG:4326",
         )
-        buffer = create_buffer_box(
-            projected_point, buffer_distance=25
-        )
+        buffer = create_buffer_box(projected_point, buffer_distance=25)
 
         clip_orthomoasic_by_location(
             bounding_box=buffer,
@@ -714,8 +771,9 @@ if __name__ == '__main__':
         #     output_file_name= f"{orthomosaic_path.stem}_cropped_by_location.jpg"
         # )
 
-        ipf = ImagePatchFinderLG(template_path=drone_image_path,
-                                 large_image_path=orthomosaic_crop_path)
+        ipf = ImagePatchFinderLG(
+            template_path=drone_image_path, large_image_path=orthomosaic_crop_path
+        )
 
         ipf.find_patch()
         # ax_i = visualise_image(image_path=ipf.large_image_path, show=False, dpi=150, title=f"Projected {drone_image_path.name} onto Orthomosaic {orthomosaic_path.name} ")
@@ -723,15 +781,18 @@ if __name__ == '__main__':
 
         debug_homography_transformation(drone_image_path, orthomosaic_crop_path, ipf.M)
 
-        saved_geotiff = georeference_image_simple_high_res(image_path=drone_image_path,
-                                        orthomosaic_path=orthomosaic_crop_path,
-                                        M=ipf.M, output_path=output_path, scale_factor=1.2)
+        saved_geotiff = georeference_image_simple_high_res(
+            image_path=drone_image_path,
+            orthomosaic_path=orthomosaic_crop_path,
+            M=ipf.M,
+            output_path=output_path,
+            scale_factor=1.2,
+        )
 
-        convert_to_cog(input_file=saved_geotiff, output_file=output_cog_path, overwrite=False)
+        convert_to_cog(
+            input_file=saved_geotiff, output_file=output_cog_path, overwrite=False
+        )
 
         orthomosaic_crop_path.unlink()
-
-        # TODO collect the centroid of the projected polygon and save it to a file
-        # these can be used to find the most suitable drone image for a given orthomosaic
 
         gc.collect()

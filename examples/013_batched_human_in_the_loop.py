@@ -3,8 +3,10 @@ step 3: find modified annotations from cvat, download them, delete them create a
 
 
 """
+
 import os
 from pathlib import Path
+
 import fiftyone as fo
 import pandas as pd
 import shapely
@@ -12,7 +14,8 @@ from loguru import logger
 
 from image_template_search.types.workflow_config import (
     load_yaml_config,
-    BatchWorkflowConfiguration, BatchWorkflowReportConfiguration, persist_file,
+    BatchWorkflowReportConfiguration,
+    persist_file,
 )
 from image_template_search.util.HastyAnnotationV2 import (
     hA_from_file,
@@ -22,21 +25,25 @@ from image_template_search.util.HastyAnnotationV2 import (
 )
 from image_template_search.util.util import visualise_image, visualise_polygons
 
-
 if __name__ == "__main__":
-    if os.getenv("FIFTYONE_CVAT_PASSWORD") is None or os.getenv("FIFTYONE_CVAT_USERNAME") is None:
-        raise ValueError("FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set")
+    if (
+        os.getenv("FIFTYONE_CVAT_PASSWORD") is None
+        or os.getenv("FIFTYONE_CVAT_USERNAME") is None
+    ):
+        raise ValueError(
+            "FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set"
+        )
 
-    #config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04.yaml")
-    config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04_short.yaml")
+    # config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04.yaml")
+    config_path = Path(
+        "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04_short.yaml"
+    )
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/batch_workflow_report_config_San_STJB01_10012023.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/batch_workflow_report_config_Snt_STJB06_12012023.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03/batch_workflow_report_config_FCD01_02_03.yaml")
 
     batched_workflow_report = load_yaml_config(
-        yaml_file_path=Path(
-            config_path
-        ),
+        yaml_file_path=Path(config_path),
         cls=BatchWorkflowReportConfiguration,
     )
     assert isinstance(
@@ -53,7 +60,8 @@ if __name__ == "__main__":
     )
     hA_corrected.images = []
     corrected_annotations_file_path = (
-        batched_workflow_report.base_path / f"corrected_annotations_{batched_workflow_report.dataset_name}.json"
+        batched_workflow_report.base_path
+        / f"corrected_annotations_{batched_workflow_report.dataset_name}.json"
     )
 
     dataset_name = batched_workflow_report.dataset_name
@@ -148,7 +156,6 @@ if __name__ == "__main__":
         else:
             logger.info(f"Sample {sample.id} has no ground_truth_boxes")
 
-
         if hasattr(sample, "ground_truth_points"):
             for kp in sample.ground_truth_points.keypoints:
                 # iterate over the keypoints
@@ -205,7 +212,9 @@ if __name__ == "__main__":
 
         updated_labels_ig = [il for il in updated_labels if il.class_name == "iguana"]
         new_labels_ig = [il for il in new_labels if il.class_name == "iguana"]
-        unchanged_labels_ig = [il for il in unchanged_labels if il.class_name == "iguana"]
+        unchanged_labels_ig = [
+            il for il in unchanged_labels if il.class_name == "iguana"
+        ]
 
         stats_row["updated_labels"] = len(updated_labels_ig)
         stats_row["new_labels"] = len(new_labels_ig)
@@ -213,7 +222,9 @@ if __name__ == "__main__":
         stats_row["after_correction"] = (
             len(updated_labels_ig) + len(new_labels_ig) + len(unchanged_labels_ig)
         )
-        stats_row["before_correction"] = len([il for il in image.labels if il.class_name == "iguana"])
+        stats_row["before_correction"] = len(
+            [il for il in image.labels if il.class_name == "iguana"]
+        )
 
         stats.append(stats_row)
         image.labels = updated_labels + new_labels + unchanged_labels
@@ -226,7 +237,8 @@ if __name__ == "__main__":
         ax_c = visualise_polygons(
             points=[x.centroid for x in image.labels],
             ax=ax_c,
-            filename=batched_workflow_report.base_path / f"{Path(hasty_filename).stem}_corrected.jpg",
+            filename=batched_workflow_report.base_path
+            / f"{Path(hasty_filename).stem}_corrected.jpg",
             show=True,
             linewidth=3.5,
             markersize=5.5,
@@ -248,12 +260,11 @@ if __name__ == "__main__":
     batched_workflow_report.stats_path = stats_path
 
     persist_file(
-        file_path= Path(f"{config_path.stem}_corrected.yaml"),
-        config=batched_workflow_report
+        file_path=Path(f"{config_path.stem}_corrected.yaml"),
+        config=batched_workflow_report,
     )
 
     logger.info(f"Wrote report to: {batched_workflow_report}")
-
 
     # if cleanup:
     #     # Step 6: Cleanup
@@ -266,14 +277,14 @@ if __name__ == "__main__":
     #     dataset.delete_annotation_run(anno_key)
     #     fo.delete_dataset(dataset_name)
 
-        ## HOW to reconstruct the label cvat dataset
-        # labels = [
-        #     ImageLabel(
-        #         category=label.label,
-        #         bounding_box=label.bounding_box
-        #     ) .detections  # Assuming `ground_truth` field
-        # ]
-        # session = fo.launch_app(dataset, port=5151)
+    ## HOW to reconstruct the label cvat dataset
+    # labels = [
+    #     ImageLabel(
+    #         category=label.label,
+    #         bounding_box=label.bounding_box
+    #     ) .detections  # Assuming `ground_truth` field
+    # ]
+    # session = fo.launch_app(dataset, port=5151)
 
-        # logger.info("Deleting dataset")
-        # fo.delete_dataset(dataset_name)
+    # logger.info("Deleting dataset")
+    # fo.delete_dataset(dataset_name)
