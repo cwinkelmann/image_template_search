@@ -13,6 +13,9 @@ opencv-python==4.10.0.84
 # fiftyone-brain==0.17.0
 # fiftyone-db==1.1.7
 
+# LightGlue (computer vision matching)
+git+https://github.com/cvg/LightGlue.git
+
 # Geospatial (gdal and geopandas installed via conda)
 shapely==2.0.6
 rasterio==1.4.2
