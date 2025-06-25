@@ -19,19 +19,19 @@ RUN conda install -n myenv -c conda-forge \
     shapely \
     fiona \
     pyproj \
-#    numpy \
-#    scipy \
-#    scikit-learn \
-#    scikit-image \
-#    opencv \
-#    pillow \
-#    matplotlib \
-#    seaborn \
-#    tqdm \
-#    pytest \
-#    pytest-cov \
-#    jupyter \
-#    notebook \
+    numpy \
+    scipy \
+    scikit-learn \
+    scikit-image \
+    opencv \
+    pillow \
+    matplotlib \
+    seaborn \
+    tqdm \
+    pytest \
+    pytest-cov \
+    jupyter \
+    notebook \
     -y
 
 # Install PyTorch via conda (CPU version)
