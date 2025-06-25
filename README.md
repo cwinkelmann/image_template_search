@@ -67,12 +67,14 @@ This will upload an launch the cvat annotation tool, where you can correct the p
 3. Run the human-in-the-loop process to correct the projected annotations
 - 013_batched_human_in_the_loop.py
 
-This generate a stats.csv in the output directory:
+This generate a stats.csv and corrected_annotations_<datasetname>.json in the output directory:
 
 | filename | updated_labels | new_labels | unchanged_labels | after_correction | before_correction |
 |----------|----------------|------------|------------------|------------------|-------------------|
 | DJI_0066.JPG | 3 | 9 | 2 | 14 | 5 |
 | mt_DJI_0066_DD_FMO04_Orthomosaic_export_MonFeb12205040089714_cropped.jpg | 0 | 0 | 5 | 5 | 5 |
+
+The corrected contain the moved, added and unchanged labels in the hasty.ai 1.1. format for the projected image.
 
 ## Installation
 ```bash
