@@ -1,7 +1,7 @@
 """
 Step 2: Batched Template Matching
 """
-
+import os
 import typing
 from dataclasses import asdict
 from datetime import datetime
@@ -40,12 +40,21 @@ def init_image_set(bwc: BatchWorkflowConfiguration) -> tuple[typing.List[Annotat
     return hA_projection_images, projection_images_paths, hA_template
 
 if __name__ == "__main__":
+    # assert FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables are set
+    if os.getenv("FIFTYONE_CVAT_PASSWORD") is None or os.getenv("FIFTYONE_CVAT_USERNAME") is None:
+        raise ValueError("FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set")
+    organization = "IguanasFromAbove"
+    project_name = "Orthomosaic_quality_control"
+
+
+    # CVAT correction, see https://docs.voxel51.com/integrations/cvat.html for documentation
 
 
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/batched_workflow_config_Snt_STJB06_12012023.yaml")
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_San_STJB01_10012023.yaml")
     # bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FCD01_02_03.yaml")
     bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04.yaml")
+    bwc_file_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/examples/workflow_configs/batched_workflow_config_FMO04_short.yaml")
 
 
     bwc = load_yaml_config(yaml_file_path=bwc_file_path, cls=BatchWorkflowConfiguration)
@@ -66,8 +75,11 @@ if __name__ == "__main__":
     file_path = bwc.base_path / f"combined_annotations_{bwc.dataset_name}.json"
     HastyAnnotationV2.save(hA_template, file_path=file_path)
     bwrc.combined_annotations_path = file_path
+    bwrc.anno_key = bwc.dataset_name
+    bwrc.dataset_name = bwc.dataset_name
 
-    persist_file(config=bwrc, file_path=bwc.base_path / f"batch_workflow_report_config_{bwc.dataset_name}.yaml")
+    batch_workflow_report_config_file_path = bwc.base_path / f"batch_workflow_report_config_{bwc.dataset_name}.yaml"
+    persist_file(config=bwrc, file_path=batch_workflow_report_config_file_path)
 
     try:
         # create dot annotations
@@ -81,13 +93,15 @@ if __name__ == "__main__":
         dataset.annotate(
             anno_key=bwc.dataset_name,
             # Using a organization requires a team account for 33USD
-            # project_name = "Orthomosaic_quality_control",
-            # organization=organization
             label_field="ground_truth_points",
             attributes=["iscrowd"],
             launch_editor=True,
+            organization=organization,
+            project_name=project_name
         )
         print(dataset.get_annotation_info(bwc.dataset_name))
     except ValueError as e:
         logger.error(e)
-        logger.error(f"Could not create annotation dataset {bwc.dataset_name} probably because the name is already taken, delete it first.")
+        logger.error(f"Could not create annotation dataset {bwc.dataset_name} probably because the name is already taken, delete it first. If you want to delete it, use the FiftyOne CLI: \n >>  'fiftyone delete {bwc.dataset_name}'")
+
+    logger.info(f"Wrote batch workflow report config to {batch_workflow_report_config_file_path.resolve()}. Use that file for the next step in the workflow after you corrected the annotations in CVAT.")

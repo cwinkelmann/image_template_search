@@ -3,7 +3,7 @@ step 3: find modified annotations from cvat, download them, delete them create a
 
 
 """
-
+import os
 from pathlib import Path
 import fiftyone as fo
 import pandas as pd
@@ -24,8 +24,11 @@ from image_template_search.util.util import visualise_image, visualise_polygons
 
 
 if __name__ == "__main__":
+    if os.getenv("FIFTYONE_CVAT_PASSWORD") is None or os.getenv("FIFTYONE_CVAT_USERNAME") is None:
+        raise ValueError("FIFTYONE_CVAT_PASSWORD and FIFTYONE_CVAT_USERNAME env variables must be set")
 
-    config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04.yaml")
+    #config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04.yaml")
+    config_path = Path("/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/batch_workflow_report_config_FMO04_short.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/San_STJB01_10012023/batch_workflow_report_config_San_STJB01_10012023.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/Snt_STJB06_12012023/batch_workflow_report_config_Snt_STJB06_12012023.yaml")
     # config_path = Path("/Users/christian/data/2TB/ai-core/data/google_drive_mirror/Orthomosaics_for_quality_analysis/FCD01_02_03/batch_workflow_report_config_FCD01_02_03.yaml")
@@ -54,7 +57,7 @@ if __name__ == "__main__":
     )
 
     dataset_name = batched_workflow_report.dataset_name
-    anno_key = dataset_name
+    anno_key = batched_workflow_report.anno_key
 
     cleanup = False
 

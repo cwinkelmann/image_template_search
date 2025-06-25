@@ -1,0 +1,20 @@
+base_path: /Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My
+  Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04
+dataset_name: FMO04
+workflow_configurations:
+- annotations_file_path: /Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My
+    Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/all_images_2024_11_10.json
+  base_path: /Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My
+    Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04
+  buffer_distance: 30
+
+  drone_image_path: /Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My
+    Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/images_2024_10_07/single_images/DJI_0066.JPG
+  image_url: https://app.hasty.ai/projects/9d8deceb-77be-47aa-978f-abcbdc8e00f2/image/4db0c13f-692b-4ae5-b4bc-591d314d87e6?datasetId=a37b5089-ece1-42c2-bf4d-db92d2dd3e6c
+  interm_path: /Users/christian/PycharmProjects/hnee/image_template_search/data
+  orthomosaic_path: /Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My
+    Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/FMO04/DD_FMO04_Orthomosaic_export_MonFeb12205040089714.tif
+  output_path: /Users/christian/PycharmProjects/hnee/image_template_search/data/output/FMO04/DD_FMO04_Orthomosaic_export_MonFeb12205040089714
+
+
+

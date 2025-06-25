@@ -148,6 +148,8 @@ def get_config(scenario: str) -> BatchWorkflowConfiguration:
         # buffer distance in meters around drone image to locate location in orthomosaic
         buffer_distance = 60
 
+    
+
     else:
         raise ValueError("Wrong scenario given")
 

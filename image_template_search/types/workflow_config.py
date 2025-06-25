@@ -65,8 +65,6 @@ class WorkflowConfiguration:
     annotations_file_path: Path
     orthomosaic_path: Path
     interm_path: Path
-    tile_base_path: Path
-    cache_path: Path
     output_path: Path
     buffer_distance: int
 
@@ -97,6 +95,7 @@ class BatchWorkflowConfiguration:
     """
     base_path: Path
     dataset_name: str
+    anno_key: str = field(default="default_annotations_key")
     workflow_configurations: List[WorkflowConfiguration] = field(default_factory=list)
 
 

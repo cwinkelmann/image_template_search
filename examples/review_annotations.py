@@ -324,19 +324,20 @@ def debug_hasty_fiftyone_v3(
 if __name__ == '__main__':
     ## The image for Andrea:
     base_path = Path(
-        "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/")
+        "/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis")
     images_dir = base_path / "San_STJB01_10012023/template_images/San_STJB01_10012023_DJI_0068"
     drone_image = images_dir / "San_STJB01_10012023_DJI_0068.JPG"
     image_2 = base_path / "San_STJB01_10012023/San_STJB01_10012023_orthomosaic_DDeploy.tif"
 
-    annotations_file_path = base_path / "San_STJB01_10012023/template_images/methods_paper_labels.json"
-    # annotations_file_path = base_path / "San_STJB01_10012023/template_images/methods_paper_labels_points.json"
+    annotations_file_path = base_path / "Snt_STJB01_10012023/template_images/methods_paper_labels.json"
+    # annotations_file_path = base_path / "Snt_STJB01_10012023/template_images/methods_paper_labels_points.json"
     # load hasty annotations
     hA = hA_from_file(file_path=annotations_file_path)
     hA_images = [i for i in hA.images if i.image_name in [drone_image.name]]
 
-    projected_annotation_path = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/template_annotations_projected.json")
+    projected_annotation_path = Path('/Users/christian/Library/CloudStorage/GoogleDrive-christian.winkelmann@gmail.com/My Drive/Datasets/IguanasFromAbove/Orthomosaics for quality analysis/Snt_STJB01_10012023/output_Snt_STJB01_10012023/corrected_annotations_San_STJB01_10012023.json')
     projected_image = Path("/Users/christian/PycharmProjects/hnee/image_template_search/data/output/matched_template_DJI_0366_Metashape_FCD01-02-03-orthomosaic_cropped.jpg")
+
     hA_proj = hA_from_file(file_path=projected_annotation_path)
     hA_proj_images = [i for i in hA_proj.images if i.image_name in [projected_image.name]]
 
