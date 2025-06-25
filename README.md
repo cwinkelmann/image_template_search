@@ -8,6 +8,10 @@ find template images in larger image sets. This allows for the following workflo
 ## Installation
 ```bash
 conda create -n image_template_search python=3.11
+
+conda activate image_template_search
+
+conda install gdal
 ```
 install LightGlue first
 
@@ -25,6 +29,7 @@ pip install -e .
 Then install the requirements
 ```bash
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # run the tests
 pytest tests

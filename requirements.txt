@@ -2,6 +2,7 @@
 torch>=2.5.1
 pandas==2.2.3
 joblib==1.4.2
+scipy==1.16.0
 
 # Computer Vision
 opencv-python==4.10.0.84
@@ -21,6 +22,7 @@ shapely==2.0.6
 rasterio==1.4.2
 pyproj==3.7.0
 fiona==1.9.6
+geopandas==1.1.0
 
 # Data validation
 pydantic==2.9.2
