@@ -71,6 +71,11 @@ jobs:
       run: |
         echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
+    - name: Verify image exists
+      run: |
+        echo "Checking if image exists: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
   # Job 2: Use the cached container for testing
   test:
     needs: build-container
