@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     libfontconfig1-dev \
+    git \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
