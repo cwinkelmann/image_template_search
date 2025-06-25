@@ -553,7 +553,7 @@ def find_patch_stacked(template_path,
 
     ## TODO use at least multiprocessing or dask to parallize this
     crops = []
-
+    failed_images = []
     for large_image_path in large_image_paths:
         logger.info(f"finding patch in {large_image_path}")
 
@@ -578,6 +578,9 @@ def find_patch_stacked(template_path,
                 # no match
                 pass
         except NoMatchError as e:
-            logger.warning(f"patch not found in {large_image_path}")
+            logger.warning(f"patch not found in {large_image_path}. Error: {str(e)}")
+            failed_images.append(large_image_path)
 
+    if failed_images:
+        logger.info(f"Failed to find patches in the following images: {', '.join(map(str, failed_images))}")
     return crops
