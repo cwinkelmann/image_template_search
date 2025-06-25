@@ -1,17 +1,8 @@
-import tempfile
-
 import pytest
-import numpy as np
-from pathlib import Path
-
-import shapely
 from shapely.geometry import Polygon
 
-
-from conf.config_dataclass import CacheConfig
-from detection_deduplication import find_annotated_template_matches, cutout_detection_deduplication
+from examples.playground.detection_deduplication import find_annotated_template_matches, cutout_detection_deduplication
 from image_template_search.util.HastyAnnotationV2 import hA_from_file, ImageLabel, HastyAnnotationV2
-from image_template_search.util.util import visualise_image
 
 
 @pytest.fixture
@@ -36,19 +27,12 @@ def output_path():
     return Path(__file__ ).parent / "output/cutouts/"
 
 import tempfile
-import unittest
 from pathlib import Path
-from time import sleep
-
-import numpy as np
 
 from conf.config_dataclass import CacheConfig
 import pytest
 from unittest.mock import patch
 
-from image_template_search.image_patch_finder import ImagePatchFinderLG
-from image_template_search.types.exceptions import DetailedNoMatchError
-from image_template_search.util.util import visualise_polygons
 from image_template_search.util.util import visualise_image
 
 

@@ -108,10 +108,7 @@ pytest tests
 ### Further Examples
 look into the notebooks
 
-This template from: 
 
-There are 3 set of orthomosaics, with for mosaics each from metashape, pix4d, dronedeploy, opendronemap
-- ../IguanasFromAbove/Orthomosaics for quality analysis/<Mission_Name>/
 
 
 ### Credits
