@@ -1,0 +1,35 @@
+[project]
+name = "image_template_search"
+description = """ Collection of tools to use the homography of image and a modified approach of template matching to track object across overapping images"""
+version = "0.1"
+authors = [
+    {name = "Christian Winkelmann"},
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+urls = {Repository = "https://github.com/yourusername/image_template_search/"}
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = ["black==23.12.1", "flake8", "isort", "pytest"]
+
+[tool.setuptools]
+packages = ["image_template_search"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".",
+  "LightGlue"
+]
