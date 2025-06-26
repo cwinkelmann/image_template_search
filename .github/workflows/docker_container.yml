@@ -1,8 +1,13 @@
-name: Build and Push Docker Container
-
+name: Build and Push Docker Container, then Run Tests
+# This workflow builds a Docker container for Python GDAL, pushes it to GitHub Container Registry,
 on:
   push:
-  pull_request:
+    branches:
+      - main
+      - container/*
+      - release/*
+    tags:
+      - v*
 
 env:
   REGISTRY: ghcr.io
@@ -99,7 +104,7 @@ jobs:
       run: |
         python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')"
         python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
-        
+
 
     - name: Run tests
       run: |
