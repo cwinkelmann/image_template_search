@@ -133,8 +133,7 @@ def find_patch_tiled(template_path: Path,
 
     fx = 1
     fy = 1
-    # keep 70% of the keypoints and descriptors
-    keepers = 100
+    keepers = 100     # keep keppers % of the keypoints and descriptors
 
     # SIFT Based Feature Extractor
     detector = cv2.SIFT_create()
