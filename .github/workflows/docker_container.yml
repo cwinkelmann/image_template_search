@@ -1,11 +1,5 @@
-name: Build and Cache Docker Container
+name: Build and Push Docker Container
 
-#on:
-#  push:
-#    branches: [ main, develop ]
-#  pull_request:
-#    branches: [ main ]
-# TODO this is for testing
 on:
   push:
   pull_request:

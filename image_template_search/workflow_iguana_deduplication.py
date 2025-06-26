@@ -20,7 +20,7 @@ from image_template_search.types.workflow_config import (
 from image_template_search.util.HastyAnnotationV2 import hA_from_file
 from image_template_search.util.util import get_exif_metadata
 from image_template_search.util.util import visualise_image, visualise_polygons
-from image_template_search.image_patch_finder import ImagePatchFinderCV, ImagePatchFinderLG
+from image_template_search.image_patch_finder import ImagePatchFinderLG
 
 from rasterio import CRS
 from image_template_search.geospatial_transformations import (
@@ -39,8 +39,6 @@ from image_template_search.util.HastyAnnotationV2 import (
 from PIL import Image as PILImage
 
 from image_template_search.util.projection import project_image
-
-from examples.review_annotations import debug_hasty_fiftyone
 
 
 #
@@ -126,7 +124,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
             )
 
     buffer_geojson_path = (
-        c.output_path / f"{c.drone_image_path.stem}_{c.buffer_distance}_buffer.geojson"
+            c.output_path / f"{c.drone_image_path.stem}_{c.buffer_distance}_buffer.geojson"
     )
     save_polygon_as_geojson(buffer, buffer_geojson_path, EPSG_code=epsg)
     wrconf.buffer_geojson_path = buffer_geojson_path
@@ -294,7 +292,6 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
     images_set = [projected_image_2_path]
     assert len(hA.images) == 1, "There should be one image in there"
 
-
     hA.save(projected_annotation_path)
     wrconf.projected_annotation_file_path = projected_annotation_path
     wrconf.projected_image_2_path = projected_image_2_path
@@ -303,7 +300,7 @@ def workflow_project_single_image_drone_and_annotations(c: WorkflowConfiguration
 
     persist_file(
         file_path=wrconf.output_path
-        / f"workflow_report_{c.orthomosaic_path.stem}.yaml",
+                  / f"workflow_report_{c.orthomosaic_path.stem}.yaml",
         config=wrconf,
     )
 
