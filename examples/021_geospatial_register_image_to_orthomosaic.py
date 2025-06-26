@@ -3,10 +3,6 @@ Georeference a drone image to an orthomosaic using a homography matrix.
 
 This allows for overlaying them on an orthomosaic, which is useful for visualizing the drone image in its geospatial context and the quality difference of both images.
 This is similar to workflow_iguana_deduplication.py
-
-
-This is a bit different to getting the homography between two non-geospatial images
-
 """
 
 import gc
@@ -239,7 +235,6 @@ def georeference_image_adaptive_resolution(
     return str(output_path)
 
 
-# Convenience function for maximum quality
 def georeference_image_max_quality(image_path, orthomosaic_path, M, output_path=None):
     """Maximum quality georeferencing - preserves as much resolution as possible."""
     return georeference_image_adaptive_resolution(
@@ -253,7 +248,6 @@ def georeference_image_max_quality(image_path, orthomosaic_path, M, output_path=
     )
 
 
-###
 def georeference_image_high_quality(image_path, orthomosaic_path, M, output_path=None):
     """
     High-quality version with optimal settings for best results.
@@ -668,11 +662,7 @@ def georeference_image_simple_high_res(
 
 
 if __name__ == "__main__":
-
-    # drone_image_path = Path(
-    #     "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0918_06122021_Nazca.JPG")
-    # drone_image_path = Path(
-    #     "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021/Flo_FLPC07_DJI_0051_22012021.JPG")
+    EPSG_STRING: str = "EPSG:32715"
 
     drone_image_path = Path(
         "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC07_22012021"
@@ -680,12 +670,9 @@ if __name__ == "__main__":
     drone_image_path = Path(
         "/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Floreana/FLPC06_22012021"
     )
-    # drone_image_path = Path(
-    #     "/Volumes/G-DRIVE/Iguanas_From_Above/2021 Jan/Photos from drone/Floreana/22.01.21/FPC07/")
 
     drone_image_paths = list_images(drone_image_path, extension="JPG", recursive=False)
 
-    # orthomosaic_path = Path("/Volumes/G-DRIVE/Iguanas_From_Above/2020_2021_2022_2023_2024/Marchena/MBN01_06122021/Mar_MBN01_DJI_0919_06122021_Nazca.JPG")
     orthomosaic_path = Path(
         "/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Drone Deploy orthomosaics/Mar_MBN01_06122021.tif"
     )
@@ -702,20 +689,13 @@ if __name__ == "__main__":
     proj_orthomosaic_path = Path(
         "/Users/christian/Downloads/Flo_FLPC06_22012021_MS_32715.tif"
     )
-    # orthomosaic_crop_path = Path(
-    #     "'/Volumes/G-DRIVE/Iguanas_From_Above/Manual_Counting/Agisoft orthomosaics/Flo/Flo_FLPC07_22012021.tif'")
 
     output_base_path = (
         Path("/Volumes/2TB/projected_drone_images_MS") / drone_image_path.name
     )
-    # output_base_path = Path("/Volumes/u235425.your-storagebox.de/Iguanas_From_Above/temp") / drone_image_path.name
     output_base_path.mkdir(parents=True, exist_ok=True)
 
     for drone_image_path in drone_image_paths:
-
-        # if drone_image_path.name != "Flo_FLPC07_DJI_0051_22012021.JPG":
-        # if drone_image_path.name != "Flo_FLPC07_DJI_0980_22012021.JPG":
-        #     continue
         orthomosaic_crop_path = Path(
             f"{orthomosaic_path.name}_cropped_{drone_image_path.stem}.tif"
         )
@@ -736,7 +716,7 @@ if __name__ == "__main__":
         location_long_lat = shapely.Point(
             image_meta_data.longitude, image_meta_data.latitude
         )
-        EPSG_STRING: str = "EPSG:32715"
+
         target_crs = CRS({"init": EPSG_STRING})
         if proj_orthomosaic_path.exists():
             orthomosaic_path = proj_orthomosaic_path
@@ -763,21 +743,11 @@ if __name__ == "__main__":
 
         logger.info(f"Clipped orthomosaic saved to {orthomosaic_crop_path}")
 
-        # visualise_image(
-        #     image_path=orthomosaic_crop_path,
-        #     show=True,
-        #     dpi=75,
-        #     title="Cropped and projected Mosaic image",
-        #     output_file_name= f"{orthomosaic_path.stem}_cropped_by_location.jpg"
-        # )
-
         ipf = ImagePatchFinderLG(
             template_path=drone_image_path, large_image_path=orthomosaic_crop_path
         )
 
         ipf.find_patch()
-        # ax_i = visualise_image(image_path=ipf.large_image_path, show=False, dpi=150, title=f"Projected {drone_image_path.name} onto Orthomosaic {orthomosaic_path.name} ")
-        # visualise_polygons(polygons=[ipf.proj_template_polygon], ax=ax_i, show=True, color="red", linewidth=4)
 
         debug_homography_transformation(drone_image_path, orthomosaic_crop_path, ipf.M)
 
