@@ -1,5 +1,5 @@
 name: Build and Push Docker Container, then Run Tests
-
+# This workflow builds a Docker container for Python GDAL, pushes it to GitHub Container Registry,
 on:
   push:
     branches:
