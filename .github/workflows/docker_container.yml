@@ -1,11 +1,13 @@
-name: Build and Push Docker Container
+name: Build and Push Docker Container, then Run Tests
 
 on:
   push:
     branches:
       - main
+      - container/*
+      - release/*
     tags:
-      - 'v*'
+      - v*
 
 env:
   REGISTRY: ghcr.io
@@ -84,26 +86,26 @@ jobs:
         echo "Checking if image exists: $PRIMARY_TAG"
         docker manifest inspect "$PRIMARY_TAG"
 
-#  # Job 2: Use the cached container for testing
-#  test:
-#    needs: build-container
-#    runs-on: ubuntu-latest
-#    container:
-#      image: ${{ needs.build-container.outputs.image }}
-#      credentials:
-#        username: ${{ github.actor }}
-#        password: ${{ secrets.GITHUB_TOKEN }}
-#
-#    steps:
-#    - name: Checkout code
-#      uses: actions/checkout@v4
-#
-#    - name: Verify environment
-#      run: |
-#        python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')"
-#        python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
-#
-#
-#    - name: Run tests
-#      run: |
-#        pytest -v --cov=. --cov-report=xml
+  # Job 2: Use the cached container for testing
+  test:
+    needs: build-container
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-container.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Verify environment
+      run: |
+        python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')"
+        python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
+
+
+    - name: Run tests
+      run: |
+        pytest -v --cov=. --cov-report=xml
