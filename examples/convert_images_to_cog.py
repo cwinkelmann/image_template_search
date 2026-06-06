@@ -26,7 +26,7 @@ input_files = [f for f in input_files if Path(f).stem not in [Path(f).stem for f
 #     output_file = output_dir / f"{Path(input_file).stem}.tif"
 #     convert_to_cog(input_file, output_file)
 
-batch_convert_to_cog(input_files, output_dir, max_workers=4)
+batch_convert_to_cog(input_files, output_dir, max_workers=2)
 
 
 ### Batch command
